@@ -1,0 +1,57 @@
+/* modules/kasir/kasir.css – Kasir Module Styles */
+
+/* Kasir layout sudah di main.css (pos-grid, product-*, cart-*, log-*)
+   File ini berisi style tambahan spesifik kasir */
+
+.income-period-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.income-period-card {
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  text-align: center;
+}
+.income-period-val  { font-family: 'Playfair Display', serif; font-size: 1.1rem; color: var(--primary); font-weight: 700; }
+.income-period-lbl  { font-size: .74rem; color: var(--text3); margin-top: 2px; }
+
+.order-filter-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.log-empty { text-align: center; padding: 30px 16px; color: var(--text3); font-size: .9rem; }
+.log-empty .icon { font-size: 2.5rem; margin-bottom: 8px; opacity: .4; }
+
+.order-detail {
+  font-size: .78rem;
+  color: var(--text3);
+  margin-top: 4px;
+  line-height: 1.6;
+}
+
+.total-period-box {
+  background: rgba(255,107,0,.07);
+  border: 1px solid rgba(255,107,0,.2);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.total-period-label { font-size: .85rem; color: var(--text2); }
+.total-period-val   { font-family: 'Playfair Display', serif; font-size: 1.3rem; color: var(--primary); font-weight: 700; }
+
+@media (max-width: 600px) {
+  .income-period-grid { grid-template-columns: 1fr; }
+}

@@ -1,0 +1,82 @@
+/* modules/users/users.css – Users Module Styles */
+
+.user-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border2);
+  transition: var(--transition);
+}
+.user-card:last-child { border-bottom: none; }
+.user-card:hover { background: rgba(255,107,0,.03); }
+
+.user-card-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+.avatar-owner    { background: linear-gradient(135deg,#FF6B00,#E05A00); color:#fff; }
+.avatar-admin    { background: linear-gradient(135deg,#3B82F6,#1D4ED8); color:#fff; }
+.avatar-cadangan { background: linear-gradient(135deg,#8B5CF6,#6D28D9); color:#fff; }
+
+.user-card-info { flex: 1; min-width: 0; }
+.user-card-name { font-weight: 600; color: var(--text); margin-bottom: 2px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.user-card-sub  { font-size: .78rem; color: var(--text3); }
+.you-tag { font-size: .68rem; background: rgba(255,107,0,.15); color: var(--primary); padding: 1px 6px; border-radius: 4px; }
+
+.user-card-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.branch-select {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 8px;
+  color: var(--text);
+  font-size: .78rem;
+  font-family: inherit;
+  cursor: pointer;
+  outline: none;
+  max-width: 140px;
+}
+
+.level-select {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 8px;
+  color: var(--text);
+  font-size: .78rem;
+  font-family: inherit;
+  cursor: pointer;
+  outline: none;
+  max-width: 150px;
+}
+
+.user-filter-bar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.user-count-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-radius: 99px;
+  font-size: .82rem;
+  font-weight: 600;
+}
+
+@media (max-width: 600px) {
+  .user-card { flex-direction: column; align-items: flex-start; }
+  .user-card-actions { width: 100%; }
+}

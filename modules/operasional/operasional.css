@@ -1,0 +1,68 @@
+/* modules/operasional/operasional.css – Operasional Module Styles */
+
+.alat-card {
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  margin-bottom: 12px;
+  transition: var(--transition);
+  position: relative;
+}
+.alat-card:hover { border-color: rgba(255,107,0,.3); }
+.alat-card.due-soon {
+  border-color: rgba(234,179,8,.35);
+  background: rgba(234,179,8,.05);
+}
+
+.alat-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.alat-badge-due {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(234,179,8,.2);
+  border: 1px solid rgba(234,179,8,.3);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: .72rem;
+  color: #FDE68A;
+}
+
+.alat-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  font-size: .82rem;
+  color: var(--text3);
+  margin-bottom: 10px;
+}
+.alat-meta-item { display: flex; align-items: center; gap: 4px; }
+.alat-price { font-family: 'Playfair Display', serif; font-size: 1.1rem; color: var(--primary); font-weight: 700; }
+
+.ops-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.ops-stat-box {
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  text-align: center;
+}
+.ops-stat-val { font-family: 'Playfair Display', serif; font-size: 1.4rem; color: var(--primary); }
+.ops-stat-lbl { font-size: .8rem; color: var(--text3); margin-top: 2px; }
+
+@media (max-width: 480px) {
+  .ops-stats { grid-template-columns: 1fr; }
+}

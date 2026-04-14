@@ -1,0 +1,49 @@
+/* modules/stok/stok.css – Stok Module Styles */
+
+.stok-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px,1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.stok-summary-card {
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  text-align: center;
+}
+.stok-summary-name  { font-size: .75rem; font-weight: 600; color: var(--text2); margin-bottom: 8px; }
+.stok-summary-emoji { font-size: 1.6rem; margin-bottom: 4px; }
+.stok-summary-row   { display: flex; justify-content: space-between; font-size: .78rem; color: var(--text3); margin-top: 3px; }
+.stok-summary-val   { color: var(--text); font-weight: 600; }
+.stok-pakai         { margin-top: 8px; font-size: 1rem; font-weight: 700; color: var(--accent); }
+.stok-pakai.minus   { color: #FCA5A5; }
+.stok-pakai.zero    { color: var(--text3); }
+
+.stok-toggle-btns {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.stok-period-total {
+  background: rgba(59,130,246,.07);
+  border: 1px solid rgba(59,130,246,.2);
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+  margin-bottom: 14px;
+  font-size: .88rem;
+  color: #93C5FD;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.stok-period-total strong { color: var(--text); }
+
+@media (max-width: 600px) {
+  .stok-summary-grid { grid-template-columns: repeat(2, 1fr); }
+}
