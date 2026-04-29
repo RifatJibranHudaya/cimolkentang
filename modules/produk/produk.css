@@ -1,0 +1,61 @@
+/* modules/produk/produk.css – Produk Management Styles */
+
+.produk-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.produk-card {
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 16px;
+  text-align: center;
+  position: relative;
+  transition: var(--transition);
+}
+.produk-card:hover { border-color: rgba(255,107,0,.3); transform: translateY(-2px); box-shadow: var(--shadow); }
+.produk-card.inactive {
+  opacity: .5;
+  filter: grayscale(.5);
+}
+
+.produk-card-emoji { font-size: 2.8rem; margin-bottom: 8px; display: block; }
+.produk-card-name  { font-size: 1rem; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.produk-card-price { font-size: .85rem; color: var(--primary); font-weight: 600; margin-bottom: 8px; }
+.produk-card-desc  { font-size: .75rem; color: var(--text3); line-height: 1.5; margin-bottom: 10px; min-height: 32px; }
+
+.produk-card-actions { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+
+.produk-status-badge {
+  position: absolute;
+  top: 10px; right: 10px;
+  font-size: .68rem;
+  padding: 2px 7px;
+  border-radius: 99px;
+  font-weight: 600;
+}
+.status-active   { background: rgba(22,163,74,.15); color: #86EFAC; border: 1px solid rgba(22,163,74,.25); }
+.status-inactive { background: rgba(100,100,100,.15); color: #9CA3AF; border: 1px solid rgba(100,100,100,.25); }
+
+.emoji-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px;
+  background: var(--bg2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+.emoji-opt {
+  font-size: 1.4rem;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  border: 2px solid transparent;
+  transition: var(--transition);
+}
+.emoji-opt:hover, .emoji-opt.selected { border-color: var(--primary); background: rgba(255,107,0,.1); }

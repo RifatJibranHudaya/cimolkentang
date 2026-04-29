@@ -24,6 +24,17 @@ $prodToday   = $conn->query("SELECT COALESCE(SUM(harga),0) as t FROM production 
 $opTotal     = $conn->query("SELECT COUNT(*) as c FROM operational")->fetch_assoc()['c'];
 $userCount   = $conn->query("SELECT COUNT(*) as c FROM users")->fetch_assoc()['c'];
 
+// Chart data: 7 hari terakhir
+$chartLabels = [];
+$chartData   = [];
+for ($i = 6; $i >= 0; $i--) {
+    $d = date('Y-m-d', strtotime("-$i days"));
+    $lbl = date('d/m', strtotime("-$i days"));
+    $val = $conn->query("SELECT COALESCE(SUM(total),0) as t FROM orders WHERE DATE(created_at)='$d'$branchWhere")->fetch_assoc()['t'];
+    $chartLabels[] = $lbl;
+    $chartData[] = (int)$val;
+}
+
 // Nama hari Indonesia
 $days = ['Sunday'=>'Minggu','Monday'=>'Senin','Tuesday'=>'Selasa','Wednesday'=>'Rabu','Thursday'=>'Kamis','Friday'=>'Jumat','Saturday'=>'Sabtu'];
 $months_id = ['January'=>'Januari','February'=>'Februari','March'=>'Maret','April'=>'April','May'=>'Mei','June'=>'Juni','July'=>'Juli','August'=>'Agustus','September'=>'September','October'=>'Oktober','November'=>'November','December'=>'Desember'];
@@ -84,6 +95,14 @@ renderHeader('Dashboard', 'dashboard');
   <div class="stat-card">
     <div class="stat-val"><?= $userCount ?></div>
     <div class="stat-label">👥 Total Pengguna</div>
+  </div>
+</div>
+
+<!-- Chart Section -->
+<div class="card mb-3">
+  <div class="card-title">📈 Pertumbuhan Pendapatan (7 Hari Terakhir)</div>
+  <div style="position: relative; height:250px; width:100%">
+    <canvas id="incomeChart"></canvas>
   </div>
 </div>
 
@@ -159,5 +178,47 @@ renderHeader('Dashboard', 'dashboard');
   </div>
 
 </div>
+
+<script>
+const ctx = document.getElementById('incomeChart').getContext('2d');
+new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: <?= json_encode($chartLabels) ?>,
+        datasets: [{
+            label: 'Pendapatan (Rp)',
+            data: <?= json_encode($chartData) ?>,
+            borderColor: '#FF6B00',
+            backgroundColor: 'rgba(255, 107, 0, 0.1)',
+            borderWidth: 3,
+            fill: true,
+            tension: 0.4,
+            pointBackgroundColor: '#FF6B00',
+            pointBorderColor: '#130800',
+            pointBorderWidth: 2,
+            pointRadius: 4,
+            pointHoverRadius: 6
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                grid: { color: 'rgba(255, 107, 0, 0.1)' },
+                ticks: { color: '#9E7052' }
+            },
+            x: {
+                grid: { display: false },
+                ticks: { color: '#9E7052' }
+            }
+        }
+    }
+});
+</script>
 
 <?php renderFooter(); ?>

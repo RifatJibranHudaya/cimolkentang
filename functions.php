@@ -199,6 +199,7 @@ function renderFooter(): void {
     echo <<<HTML
   </main>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="assets/js/main.js"></script>
 </body>
 </html>

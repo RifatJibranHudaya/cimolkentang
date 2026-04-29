@@ -10,14 +10,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
-$products = [
-    ['emoji'=>'🫙','name'=>'Cimol'],
-    ['emoji'=>'🥔','name'=>'Kentang'],
-    ['emoji'=>'🐟','name'=>'Otak-otak'],
-    ['emoji'=>'🟡','name'=>'Tahu'],
-    ['emoji'=>'🌭','name'=>'Sosis'],
-    ['emoji'=>'🍡','name'=>'Bakso'],
-];
+$res = $conn->query("SELECT nama as name, emoji FROM products WHERE is_active=1 ORDER BY urutan, nama");
+$products = $res->fetch_all(MYSQLI_ASSOC);
 
 $today = date('Y-m-d');
 $week  = date('Y-m-d', strtotime('monday this week'));
