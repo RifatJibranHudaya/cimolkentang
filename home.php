@@ -219,6 +219,12 @@ body {
 </section>
 
 <footer class="footer">
+    <div style="display: flex; justify-content: center; gap: 20px; margin-bottom: 20px;">
+        <a href="#" style="color: var(--text3); font-size: 1.8rem; text-decoration: none; transition: transform 0.3s ease, color 0.3s ease;" onmouseover="this.style.transform='scale(1.2)'; this.style.color='#25D366';" onmouseout="this.style.transform='scale(1)'; this.style.color='var(--text3)';" title="WhatsApp">📱</a>
+        <a href="#" style="color: var(--text3); font-size: 1.8rem; text-decoration: none; transition: transform 0.3s ease, color 0.3s ease;" onmouseover="this.style.transform='scale(1.2)'; this.style.color='#E1306C';" onmouseout="this.style.transform='scale(1)'; this.style.color='var(--text3)';" title="Instagram">📸</a>
+        <a href="#" style="color: var(--text3); font-size: 1.8rem; text-decoration: none; transition: transform 0.3s ease, color 0.3s ease;" onmouseover="this.style.transform='scale(1.2)'; this.style.color='#1877F2';" onmouseout="this.style.transform='scale(1)'; this.style.color='var(--text3)';" title="Facebook">📘</a>
+        <a href="#" style="color: var(--text3); font-size: 1.8rem; text-decoration: none; transition: transform 0.3s ease, color 0.3s ease;" onmouseover="this.style.transform='scale(1.2)'; this.style.color='#D44638';" onmouseout="this.style.transform='scale(1)'; this.style.color='var(--text3)';" title="Email">✉️</a>
+    </div>
     <p>&copy; <?= date('Y') ?> DapurKu - Jajanan Bikin Nagih. All rights reserved.</p>
 </footer>
 

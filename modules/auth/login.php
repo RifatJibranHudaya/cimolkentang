@@ -59,7 +59,8 @@ $flash = flashGet();
 </head>
 <body>
 <div class="auth-page">
-  <div class="auth-card">
+  <div class="auth-card" style="position: relative;">
+    <a href="index.php" style="position: absolute; top: 15px; left: 15px; text-decoration: none; font-size: 1.2rem; color: var(--text2); padding: 5px; border-radius: 50%; background: var(--bg2); width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition: all 0.3s; z-index: 10;" title="Kembali ke Beranda" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">⬅️</a>
 
     <div class="auth-logo">
       <span class="logo-emoji">🍢</span>
