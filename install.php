@@ -1,16 +1,13 @@
 <?php
 // ============================================================
-// INSTALL.PHP - Jalankan sekali untuk setup database
+// INSTALL.PHP – Setup Database DapurKu POS (v2)
 // Akses: http://localhost/food-app/install.php
 // ============================================================
-
 $host   = 'localhost';
 $user   = 'root';
 $pass   = '';
 $dbname = 'food_sales_db';
-
-$errors  = [];
-$success = [];
+$errors = []; $success = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $host   = $_POST['host']   ?? 'localhost';
@@ -44,6 +41,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 `branch_id` INT DEFAULT NULL,
                 `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (`branch_id`) REFERENCES `branches`(`id`) ON DELETE SET NULL
+            ) ENGINE=InnoDB",
+
+            "products" => "CREATE TABLE IF NOT EXISTS `products` (
+                `id` INT AUTO_INCREMENT PRIMARY KEY,
+                `nama` VARCHAR(100) NOT NULL,
+                `emoji` VARCHAR(10) DEFAULT '🍡',
+                `harga_default` DECIMAL(12,0) DEFAULT 0,
+                `deskripsi` TEXT,
+                `is_active` TINYINT(1) DEFAULT 1,
+                `urutan` INT DEFAULT 0,
+                `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             ) ENGINE=InnoDB",
 
             "orders" => "CREATE TABLE IF NOT EXISTS `orders` (
@@ -105,7 +113,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 `harga` DECIMAL(12,0) NOT NULL DEFAULT 0,
                 `tempat_beli` VARCHAR(150),
                 `merk` VARCHAR(100),
-                `periode_ganti` INT DEFAULT 0 COMMENT 'in months, 0=tidak tentu',
+                `periode_ganti` INT DEFAULT 0,
                 `tanggal_beli` DATE,
                 `keterangan` TEXT,
                 `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -120,53 +128,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if (empty($errors)) {
-            // Update users schema for existing db
-            $conn->query("UPDATE users SET level='admin_cadangan' WHERE level='pembeli'");
-            $conn->query("ALTER TABLE users MODIFY level ENUM('owner','admin','admin_cadangan') DEFAULT 'admin_cadangan'");
-            
-            $res = $conn->query("SHOW COLUMNS FROM users LIKE 'branch_id'");
-            if ($res && $res->num_rows === 0) {
-                $conn->query("ALTER TABLE users ADD COLUMN branch_id INT DEFAULT NULL");
-                $conn->query("ALTER TABLE users ADD CONSTRAINT fk_branch FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL");
-            }
-
-            // Also add branch_id to orders, stock_records, and production if they don't have it
-            $branchTables = ['orders', 'stock_records', 'production'];
-            foreach ($branchTables as $t) {
-                $resB = $conn->query("SHOW COLUMNS FROM `$t` LIKE 'branch_id'");
-                if ($resB && $resB->num_rows === 0) {
-                    $conn->query("ALTER TABLE `$t` ADD COLUMN branch_id INT DEFAULT NULL");
-                    $conn->query("ALTER TABLE `$t` ADD CONSTRAINT fk_br_$t FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL");
-                }
-            }
-
-            $resProd = $conn->query("SHOW COLUMNS FROM production LIKE 'edited_by'");
-            if ($resProd && $resProd->num_rows === 0) {
-                $conn->query("ALTER TABLE production ADD COLUMN edited_by INT DEFAULT NULL");
-                $conn->query("ALTER TABLE production ADD COLUMN edited_at TIMESTAMP NULL DEFAULT NULL");
-                $conn->query("ALTER TABLE production ADD CONSTRAINT fk_prod_editor FOREIGN KEY (edited_by) REFERENCES users(id) ON DELETE SET NULL");
-            }
-
-            // Insert default branch
+            // Default branch
             $conn->query("INSERT IGNORE INTO `branches` (id, nama_cabang, alamat) VALUES (1, 'Cabang Utama', 'Pusat')");
 
-            // Create default owner account
-            $ownerPwd   = password_hash('owner123', PASSWORD_DEFAULT);
-            $ownerUser  = 'owner';
-            $ownerEmail = 'owner@dapurku.com';
-            $ownerPhone = '081234567890';
+            // Default owner
+            $ownerPwd = password_hash('owner123', PASSWORD_DEFAULT);
             $stmt = $conn->prepare("INSERT IGNORE INTO users (username,email,phone,password,level,branch_id) VALUES (?,?,?,?,'owner',1)");
+            $ownerUser = 'owner'; $ownerEmail = 'owner@dapurku.com'; $ownerPhone = '081234567890';
             $stmt->bind_param('ssss', $ownerUser, $ownerEmail, $ownerPhone, $ownerPwd);
             $stmt->execute();
 
-            // Save db.php
+            // Default products
+            $defaultProducts = [
+                ['Cimol',     '🫙', 0, 'Cimol goreng renyah khas jajan pasar'],
+                ['Kentang',   '🥔', 0, 'Kentang goreng crispy berbumbu'],
+                ['Otak-otak', '🐟', 0, 'Otak-otak ikan segar bakar/goreng'],
+                ['Tahu',      '🟡', 0, 'Tahu goreng bumbu spesial'],
+                ['Sosis',     '🌭', 0, 'Sosis goreng berbagai rasa'],
+                ['Bakso',     '🍡', 0, 'Bakso sapi kenyal dan gurih'],
+            ];
+            $stmtP = $conn->prepare("INSERT IGNORE INTO products (nama,emoji,harga_default,deskripsi,urutan) VALUES (?,?,?,?,?)");
+            foreach ($defaultProducts as $i => $p) {
+                $stmtP->bind_param('ssdsi', $p[0], $p[1], $p[2], $p[3], $i);
+                $stmtP->execute();
+            }
+
+            // Write db.php
             $cfg = "<?php\n// db.php – dibuat otomatis oleh install.php\ndefine('DB_HOST', '$host');\ndefine('DB_USER', '$user');\ndefine('DB_PASS', '$pass');\ndefine('DB_NAME', '$dbname');\n\n\$conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);\nif (\$conn->connect_error) {\n    header('Location: install.php');\n    exit;\n}\n\$conn->set_charset('utf8mb4');\n";
             file_put_contents(__DIR__ . '/db.php', $cfg);
 
             $success[] = "✅ Database <strong>$dbname</strong> berhasil dibuat!";
-            $success[] = "✅ Semua tabel berhasil dibuat!";
+            $success[] = "✅ Semua tabel berhasil (termasuk tabel <strong>products</strong>)!";
+            $success[] = "✅ 6 produk default telah ditambahkan!";
             $success[] = "✅ Akun Owner: <strong>owner</strong> / <strong>owner123</strong>";
-            $success[] = "✅ Cabang default 'Cabang Utama' ditambahkan!";
             $success[] = "🎉 Instalasi selesai! <a href='index.php'>Klik di sini untuk masuk</a>";
         }
         $conn->close();
@@ -176,35 +170,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Instalasi – DapurKu POS</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:linear-gradient(135deg,#1a0a00 0%,#2d1500 100%);min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:'DM Sans',sans-serif;color:#FFF8F0;padding:20px}
-.card{background:rgba(42,20,0,.95);border:1px solid rgba(255,107,0,.3);border-radius:20px;padding:40px;width:100%;max-width:480px;backdrop-filter:blur(10px);box-shadow:0 20px 60px rgba(0,0,0,.5)}
+body{background:linear-gradient(135deg,#1a0a00,#2d1500);min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:'DM Sans',sans-serif;color:#FFF8F0;padding:20px}
+.card{background:rgba(42,20,0,.95);border:1px solid rgba(255,107,0,.3);border-radius:20px;padding:40px;width:100%;max-width:480px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
 h1{font-family:'Playfair Display',serif;color:#FF6B00;font-size:2rem;margin-bottom:8px;text-align:center}
 p.sub{text-align:center;color:#FF9A3C;margin-bottom:30px;font-size:.9rem}
 label{display:block;font-size:.85rem;color:#FFB347;margin-bottom:6px;font-weight:500}
-input{width:100%;background:#1C0D00;border:1px solid rgba(255,107,0,.2);border-radius:10px;padding:12px 14px;color:#FFF8F0;font-size:.95rem;margin-bottom:16px;outline:none;transition:all .2s;font-family:inherit}
+input{width:100%;background:#1C0D00;border:1px solid rgba(255,107,0,.2);border-radius:10px;padding:12px 14px;color:#FFF8F0;font-size:.95rem;margin-bottom:16px;outline:none;transition:.2s;font-family:inherit}
 input:focus{border-color:#FF6B00;box-shadow:0 0 0 3px rgba(255,107,0,.15)}
-button{width:100%;background:linear-gradient(135deg,#FF6B00,#FF8C00);border:none;border-radius:10px;padding:14px;color:#fff;font-size:1rem;font-weight:600;cursor:pointer;font-family:inherit;transition:all .2s;letter-spacing:.3px}
+button{width:100%;background:linear-gradient(135deg,#FF6B00,#E05A00);border:none;border-radius:10px;padding:14px;color:#fff;font-size:1rem;font-weight:700;cursor:pointer;font-family:inherit;transition:.2s}
 button:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(255,107,0,.4)}
-.error{background:rgba(220,38,38,.15);border:1px solid rgba(220,38,38,.4);border-radius:10px;padding:14px;margin-bottom:16px;font-size:.9rem;color:#FCA5A5}
-.success{background:rgba(22,163,74,.15);border:1px solid rgba(22,163,74,.4);border-radius:10px;padding:14px;margin-bottom:16px;font-size:.9rem;color:#86EFAC;line-height:1.8}
-.success a{color:#FF9A3C;font-weight:600}
-.logo-icon{font-size:3rem;display:block;text-align:center;margin-bottom:8px}
+.error{background:rgba(220,38,38,.15);border:1px solid rgba(220,38,38,.3);border-radius:10px;padding:14px;margin-bottom:14px;font-size:.9rem;color:#FCA5A5}
+.success{background:rgba(22,163,74,.15);border:1px solid rgba(22,163,74,.3);border-radius:10px;padding:14px;margin-bottom:14px;font-size:.9rem;color:#86EFAC;line-height:1.9}
+.success a{color:#FF9A3C;font-weight:700}
+.logo{font-size:3rem;display:block;text-align:center;margin-bottom:8px}
 </style>
 </head>
 <body>
 <div class="card">
-  <span class="logo-icon">🍢</span>
+  <span class="logo">🍢</span>
   <h1>DapurKu POS</h1>
   <p class="sub">Instalasi Database – Jalankan Sekali</p>
-  <?php foreach($errors as $e): ?>
-    <div class="error">❌ <?= $e ?></div>
-  <?php endforeach; ?>
+  <?php foreach($errors as $e): ?><div class="error">❌ <?= $e ?></div><?php endforeach; ?>
   <?php if(!empty($success)): ?>
     <div class="success"><?= implode('<br>', $success) ?></div>
   <?php else: ?>

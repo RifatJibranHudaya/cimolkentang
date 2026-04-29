@@ -38,14 +38,8 @@ if ($branchWhere) $filterWhere .= str_replace(' AND ', " AND o.", $branchWhere);
 $filterTotal = $conn->query("SELECT COALESCE(SUM(total),0) as t FROM orders o WHERE $filterWhere")->fetch_assoc()['t'];
 
 // ── Products ─────────────────────────────────────────────────
-$products = [
-    ['emoji' => '🫙', 'name' => 'Cimol'],
-    ['emoji' => '🥔', 'name' => 'Kentang'],
-    ['emoji' => '🐟', 'name' => 'Otak-otak'],
-    ['emoji' => '🟡', 'name' => 'Tahu'],
-    ['emoji' => '🌭', 'name' => 'Sosis'],
-    ['emoji' => '🍡', 'name' => 'Bakso'],
-];
+$res = $conn->query("SELECT nama as name, emoji, harga_default FROM products WHERE is_active=1 ORDER BY urutan, nama");
+$products = $res->fetch_all(MYSQLI_ASSOC);
 
 renderHeader('Kasir', 'kasir');
 echo flashGet();
@@ -80,7 +74,7 @@ echo flashGet();
         <p class="text-sm text-muted mb-2">Pilih Produk:</p>
         <div class="product-grid mb-2" id="productGrid">
           <?php foreach ($products as $p): ?>
-          <button type="button" class="product-btn" id="pbtn-<?= $p['name'] ?>" onclick="addToCart('<?= $p['name'] ?>','<?= $p['emoji'] ?>')">
+          <button type="button" class="product-btn" id="pbtn-<?= $p['name'] ?>" onclick="addToCart('<?= $p['name'] ?>','<?= $p['emoji'] ?>', <?= $p['harga_default'] ?? 0 ?>)">
             <span class="product-emoji"><?= $p['emoji'] ?></span>
             <span class="product-name"><?= $p['name'] ?></span>
           </button>
@@ -190,7 +184,7 @@ echo flashGet();
 <script>
 let cart = [];
 
-function addToCart(name, emoji) {
+function addToCart(name, emoji, defaultHarga = 0) {
   if (cart.find(i => i.name === name)) {
     const btn = document.getElementById('pbtn-' + name);
     btn.style.animation = 'none';
@@ -199,7 +193,7 @@ function addToCart(name, emoji) {
     setTimeout(() => btn.style.borderColor = '', 600);
     return;
   }
-  cart.push({ name, emoji, harga: 0 });
+  cart.push({ name, emoji, harga: defaultHarga });
   document.getElementById('pbtn-' + name).classList.add('active');
   renderCart();
 }

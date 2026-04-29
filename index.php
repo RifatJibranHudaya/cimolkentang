@@ -1,47 +1,37 @@
 <?php
-// index.php – Main Router (Clean Version)
-if (session_status() === PHP_SESSION_NONE) session_start();
+// ============================================================
+// index.php – Main Router DapurKu POS
+// ============================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
-$page = $_GET['page'] ?? 'dashboard';
+$page = $_GET['page'] ?? 'home';
 
-// ── Logout ──────────────────────────────────────────────────
+// ── Logout ────────────────────────────────────────────────────
 if ($page === 'logout') {
     session_destroy();
-    setcookie('fs_user', '', time() - 3600, '/');
+    setcookie('fs_user',  '', time() - 3600, '/');
     setcookie('fs_token', '', time() - 3600, '/');
-    header("Location: index.php?page=login");
+    header('Location: index.php?page=login');
     exit;
 }
 
-// ── Router ──────────────────────────────────────────────────
-$routes = [
-    'login'           => 'modules/auth/login.php',
-    'register'        => 'modules/auth/register.php',
-    'dashboard'       => 'modules/dashboard/dashboard.php',
-    'kasir'           => 'modules/kasir/kasir.php',
-    'stok'            => 'modules/stok/stok.php',
-    'produksi'        => 'modules/produksi/produksi.php',
-    'produksi_detail' => 'modules/produksi/produksi_detail.php',
-    'operasional'     => 'modules/operasional/operasional.php',
-    'users'           => 'modules/users/users.php',
-];
+// ── Public Pages (no auth required) ──────────────────────────
+if ($page === 'home')     { require __DIR__ . '/home.php'; exit; }
+if ($page === 'login')    { require __DIR__ . '/modules/auth/login.php'; exit; }
+if ($page === 'register') { require __DIR__ . '/modules/auth/register.php'; exit; }
 
-if (array_key_exists($page, $routes)) {
-    // Auth check for non-auth pages
-    if (!in_array($page, ['login', 'register'])) {
-        requireLogin();
-    }
-    
-    $file = __DIR__ . '/' . $routes[$page];
-    if (file_exists($file)) {
-        require_once $file;
-    } else {
-        die("404 - Module '$page' not found.");
-    }
-} else {
-    // Default fallback
-    requireLogin();
-    require_once __DIR__ . '/modules/dashboard/dashboard.php';
+// ── Auth required pages ───────────────────────────────────────
+requireLogin();
+
+switch ($page) {
+    case 'dashboard':        require __DIR__ . '/modules/dashboard/dashboard.php'; break;
+    case 'kasir':            require __DIR__ . '/modules/kasir/kasir.php';         break;
+    case 'stok':             require __DIR__ . '/modules/stok/stok.php';           break;
+    case 'produksi':         require __DIR__ . '/modules/produksi/produksi.php';   break;
+    case 'produksi_detail':  require __DIR__ . '/modules/produksi/produksi_detail.php'; break;
+    case 'operasional':      require __DIR__ . '/modules/operasional/operasional.php'; break;
+    case 'users':            require __DIR__ . '/modules/users/users.php';         break;
+    case 'produk':           require __DIR__ . '/modules/produk/produk.php';       break;
+    default:                 require __DIR__ . '/modules/dashboard/dashboard.php'; break;
 }
