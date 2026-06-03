@@ -1,0 +1,298 @@
+/* modules/kelola_akses/akses.css – Kelola Akses Table Styles */
+
+/* ── Container ──────────────────────────────────────── */
+.akses-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.akses-header h2 {
+  margin: 0;
+  font-size: 1.3rem;
+  color: var(--text);
+}
+.akses-stats {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.akses-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 99px;
+  font-size: .82rem;
+  font-weight: 600;
+  background: var(--card2);
+  color: var(--text2);
+  border: 1px solid var(--border);
+}
+
+/* ── Table ───────────────────────────────────────────── */
+.akses-table-wrap {
+  background: var(--card);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.akses-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .88rem;
+}
+.akses-table thead {
+  background: var(--bg2);
+  border-bottom: 2px solid var(--border);
+}
+.akses-table th {
+  padding: 14px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: .78rem;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--text3);
+  white-space: nowrap;
+}
+.akses-table th.center { text-align: center; }
+
+.akses-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border2);
+  vertical-align: middle;
+  color: var(--text);
+}
+.akses-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.akses-table tbody tr {
+  transition: background .2s;
+}
+.akses-table tbody tr:hover {
+  background: rgba(255,107,0,.03);
+}
+
+/* ── User Cell ───────────────────────────────────────── */
+.akses-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.akses-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: .9rem;
+  flex-shrink: 0;
+  color: #fff;
+}
+.akses-avatar.av-superadmin { background: linear-gradient(135deg, #F59E0B, #D97706); }
+.akses-avatar.av-owner      { background: linear-gradient(135deg, #FF6B00, #E05A00); }
+.akses-avatar.av-admin      { background: linear-gradient(135deg, #3B82F6, #1D4ED8); }
+.akses-avatar.av-cadangan   { background: linear-gradient(135deg, #8B5CF6, #6D28D9); }
+.akses-user-info { min-width: 0; }
+.akses-user-name {
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.akses-user-email {
+  font-size: .75rem;
+  color: var(--text3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Role Badge ──────────────────────────────────────── */
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: .75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.role-superadmin { background: rgba(245,158,11,.12); color: #F59E0B; border: 1px solid rgba(245,158,11,.25); }
+.role-owner      { background: rgba(255,107,0,.12); color: #FF6B00; border: 1px solid rgba(255,107,0,.25); }
+.role-admin      { background: rgba(59,130,246,.12); color: #60A5FA; border: 1px solid rgba(59,130,246,.25); }
+.role-cadangan   { background: rgba(139,92,246,.12); color: #A78BFA; border: 1px solid rgba(139,92,246,.25); }
+
+/* ── Toggle Switch ───────────────────────────────────── */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+}
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--border);
+  border-radius: 24px;
+  transition: .3s;
+}
+.toggle-slider:before {
+  content: "";
+  position: absolute;
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background: #fff;
+  border-radius: 50%;
+  transition: .3s;
+  box-shadow: 0 1px 3px rgba(0,0,0,.2);
+}
+.toggle-switch input:checked + .toggle-slider {
+  background: linear-gradient(135deg, #FF6B00, #E05A00);
+}
+.toggle-switch input:checked + .toggle-slider:before {
+  transform: translateX(20px);
+}
+.toggle-cell {
+  text-align: center;
+}
+
+/* ── Detail Button ───────────────────────────────────── */
+.btn-detail {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: .8rem;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: var(--card2);
+  color: var(--text);
+  cursor: pointer;
+  transition: all .2s;
+  white-space: nowrap;
+}
+.btn-detail:hover {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255,107,0,.25);
+}
+
+/* ── Detail Row (Expanded) ───────────────────────────── */
+.detail-row {
+  display: none;
+}
+.detail-row.open {
+  display: table-row;
+}
+.detail-row td {
+  padding: 0;
+  background: var(--bg2);
+  border-bottom: 2px solid var(--border);
+}
+.detail-content {
+  padding: 20px 24px;
+  animation: slideDown .3s ease;
+}
+.detail-content h4 {
+  margin: 0 0 14px 0;
+  font-size: .92rem;
+  color: var(--text);
+}
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+.detail-feature-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.detail-feature-name {
+  font-weight: 700;
+  font-size: .9rem;
+  color: var(--text);
+  text-transform: capitalize;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.detail-feature-toggles {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.detail-perm-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: .72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .2s;
+  border: 1px solid var(--border);
+  background: var(--card2);
+  color: var(--text3);
+  user-select: none;
+}
+.detail-perm-chip.active {
+  background: rgba(34,197,94,.12);
+  color: #22C55E;
+  border-color: rgba(34,197,94,.3);
+}
+.detail-perm-chip:hover {
+  transform: scale(1.05);
+}
+.detail-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+/* ── Superadmin Notice ───────────────────────────────── */
+.sa-notice {
+  font-size: .75rem;
+  color: var(--text3);
+  font-style: italic;
+  text-align: center;
+}
+
+/* ── Animations ──────────────────────────────────────── */
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Responsive ──────────────────────────────────────── */
+@media (max-width: 768px) {
+  .akses-table-wrap { overflow-x: auto; }
+  .akses-table { min-width: 700px; }
+  .detail-grid { grid-template-columns: 1fr; }
+}

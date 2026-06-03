@@ -36,7 +36,9 @@ function requireLogin(string $redirect = 'index.php') {
 
 function requireLevel(array $levels) {
     requireLogin();
-    if (!in_array($_SESSION['level'] ?? '', $levels)) {
+    $lvl = $_SESSION['level'] ?? '';
+    if ($lvl === 'superadmin') return; // Superadmin bypasses level checks
+    if (!in_array($lvl, $levels)) {
         header("Location: index.php?page=dashboard&err=access");
         exit;
     }
@@ -51,16 +53,44 @@ function currentUser(): array {
     ];
 }
 
+function isSuperadmin(): bool {
+    return ($_SESSION['level'] ?? '') === 'superadmin';
+}
+
 function isOwner(): bool {
-    return ($_SESSION['level'] ?? '') === 'owner';
+    return in_array($_SESSION['level'] ?? '', ['superadmin', 'owner']); // Treat superadmin as owner for legacy checks
 }
 
 function isAdmin(): bool {
-    return in_array($_SESSION['level'] ?? '', ['owner', 'admin']);
+    return in_array($_SESSION['level'] ?? '', ['superadmin', 'owner', 'admin']);
+}
+
+function hasPermission(string $feature, string $action = 'read'): bool {
+    if (isSuperadmin()) return true; // Superadmin has all permissions
+
+    global $conn;
+    $uid = $_SESSION['user_id'] ?? 0;
+    if (!$uid) return false;
+
+    // Check specific permission
+    $col = match($action) {
+        'create' => 'can_create',
+        'update' => 'can_update',
+        'delete' => 'can_delete',
+        default  => 'can_read'
+    };
+
+    $stmt = $conn->prepare("SELECT $col FROM user_permissions WHERE user_id=? AND feature=?");
+    $stmt->bind_param('is', $uid, $feature);
+    $stmt->execute();
+    $res = $stmt->get_result()->fetch_assoc();
+
+    return !empty($res[$col]);
 }
 
 function levelLabel(string $l): string {
     return match($l) {
+        'superadmin'     => '⭐ Superadmin',
         'owner'          => '👑 Owner',
         'admin'          => '🛡️ Admin',
         'admin_cadangan' => '🔵 Admin Cadangan',
@@ -70,6 +100,7 @@ function levelLabel(string $l): string {
 
 function levelBadgeClass(string $l): string {
     return match($l) {
+        'superadmin'     => 'badge-superadmin',
         'owner'          => 'badge-owner',
         'admin'          => 'badge-admin',
         'admin_cadangan' => 'badge-cadangan',
@@ -116,12 +147,14 @@ function renderHeader(string $pageTitle = 'DapurKu POS', string $active = ''): v
     $initial = strtoupper(mb_substr($u, 0, 1));
 
     $navItems = [
-        'dashboard'   => ['icon' => '🏠', 'label' => 'Dashboard',   'levels' => ['owner','admin','admin_cadangan']],
-        'kasir'       => ['icon' => '🧾', 'label' => 'Kasir',        'levels' => ['owner','admin','admin_cadangan']],
-        'stok'        => ['icon' => '📦', 'label' => 'Stok',         'levels' => ['owner','admin','admin_cadangan']],
-        'produksi'    => ['icon' => '🛒', 'label' => 'Produksi',     'levels' => ['owner','admin','admin_cadangan']],
-        'operasional' => ['icon' => '🔧', 'label' => 'Operasional',  'levels' => ['owner','admin']],
-        'users'       => ['icon' => '👥', 'label' => 'Pengguna',     'levels' => ['owner','admin','admin_cadangan']],
+        'dashboard'   => ['icon' => '🏠', 'label' => 'Dashboard',   'levels' => ['superadmin','owner','admin','admin_cadangan']],
+        'kasir'       => ['icon' => '🧾', 'label' => 'Kasir',        'levels' => ['superadmin','owner','admin','admin_cadangan']],
+        'produk'      => ['icon' => '🍔', 'label' => 'Produk',       'levels' => ['superadmin','owner','admin','admin_cadangan']],
+        'stok'        => ['icon' => '📦', 'label' => 'Stok',         'levels' => ['superadmin','owner','admin','admin_cadangan']],
+        'produksi'    => ['icon' => '🛒', 'label' => 'Produksi',     'levels' => ['superadmin','owner','admin','admin_cadangan']],
+        'operasional' => ['icon' => '🔧', 'label' => 'Operasional',  'levels' => ['superadmin','owner','admin']],
+        'users'       => ['icon' => '👥', 'label' => 'Pengguna',     'levels' => ['superadmin','owner','admin','admin_cadangan']],
+        'akses'       => ['icon' => '🔑', 'label' => 'Kelola Akses', 'levels' => ['superadmin']],
     ];
 
     $navHtml = '';
@@ -154,10 +187,12 @@ function renderHeader(string $pageTitle = 'DapurKu POS', string $active = ''): v
 <!-- Sidebar -->
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-header">
-    <div class="sidebar-logo">
-      <span class="logo-icon">🍢</span>
-      <span class="logo-text">DapurKu</span>
-    </div>
+    <a href="index.php?page=home" style="text-decoration:none; color:inherit; display:flex; align-items:center; gap:10px;">
+      <div class="sidebar-logo">
+        <span class="logo-icon">🍢</span>
+        <span class="logo-text">DapurKu</span>
+      </div>
+    </a>
     <button class="sidebar-close" onclick="closeSidebar()" aria-label="Tutup sidebar">✕</button>
   </div>
   <nav class="sidebar-nav">

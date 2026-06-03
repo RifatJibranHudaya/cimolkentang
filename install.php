@@ -119,6 +119,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE SET NULL
             ) ENGINE=InnoDB",
+
+            "home_content" => "CREATE TABLE IF NOT EXISTS `home_content` (
+                `id` INT AUTO_INCREMENT PRIMARY KEY,
+                `section` VARCHAR(50) NOT NULL,
+                `title` VARCHAR(255) DEFAULT NULL,
+                `subtitle` VARCHAR(500) DEFAULT NULL,
+                `content` LONGTEXT,
+                `icon` VARCHAR(10) DEFAULT NULL,
+                `order_index` INT DEFAULT 0,
+                `is_active` TINYINT(1) DEFAULT 1,
+                `created_by` INT DEFAULT NULL,
+                `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                `updated_by` INT DEFAULT NULL,
+                `updated_at` TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+                FOREIGN KEY (`created_by`) REFERENCES `users`(`id`) ON DELETE SET NULL,
+                FOREIGN KEY (`updated_by`) REFERENCES `users`(`id`) ON DELETE SET NULL
+            ) ENGINE=InnoDB"
         ];
 
         foreach ($tables as $name => $sql) {
@@ -151,6 +168,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             foreach ($defaultProducts as $i => $p) {
                 $stmtP->bind_param('ssdsi', $p[0], $p[1], $p[2], $p[3], $i);
                 $stmtP->execute();
+            }
+
+            // Default home content
+            $defaultHomeContents = [
+                ['hero', 'DapurKu - Cita Rasa Terbaik', 'Nikmati pengalaman kuliner yang tak terlupakan dengan menu pilihan berkualitas tinggi', 'Kami menghadirkan menu makanan istimewa yang dibuat dengan passion dan bahan-bahan pilihan terbaik. Setiap hidangan dirancang untuk memberikan kepuasan maksimal kepada pelanggan setia kami.', '🍢', 1],
+                ['feature', 'Kualitas Premium', 'Bahan-bahan pilihan berkualitas tinggi dari supplier terpercaya', '✓', '1', 1],
+                ['feature', 'Cepat & Segar', 'Disiapkan fresh setiap hari dengan standar kebersihan tertinggi', '⚡', '2', 1],
+                ['feature', 'Harga Terjangkau', 'Nikmati kelezatan dengan harga yang kompetitif dan terjangkau', '💰', '3', 1],
+                ['footer', 'DapurKu Restaurant', 'Jl. Contoh No. 123, Kota Pilihan | Phone: 021-XXXX-XXXX', 'Temukan kami di berbagai platform delivery atau kunjungi outlet kami langsung untuk pengalaman terbaik.', '🏪', 1]
+            ];
+            $stmtHC = $conn->prepare("INSERT IGNORE INTO home_content (section,title,subtitle,content,icon,order_index,is_active,created_by) VALUES (?,?,?,?,?,?,1,1)");
+            foreach ($defaultHomeContents as $hc) {
+                $stmtHC->bind_param('sssssi', $hc[0], $hc[1], $hc[2], $hc[3], $hc[4], $hc[5]);
+                $stmtHC->execute();
             }
 
             // Write db.php

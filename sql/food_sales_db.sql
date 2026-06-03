@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: localhost:3306
--- Generation Time: Apr 14, 2026 at 03:29 AM
+-- Generation Time: May 27, 2026 at 02:44 PM
 -- Server version: 8.0.30
 -- PHP Version: 8.1.10
 
@@ -31,6 +31,7 @@ CREATE TABLE `branches` (
   `id` int NOT NULL,
   `nama_cabang` varchar(100) NOT NULL,
   `alamat` text,
+  `map_url` text,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
@@ -38,8 +39,29 @@ CREATE TABLE `branches` (
 -- Dumping data for table `branches`
 --
 
-INSERT INTO `branches` (`id`, `nama_cabang`, `alamat`, `created_at`) VALUES
-(1, 'Cabang Utama', 'Pusat', '2026-04-09 01:53:01');
+INSERT INTO `branches` (`id`, `nama_cabang`, `alamat`, `map_url`, `created_at`) VALUES
+(1, 'Cabang Utama', 'Pusat', NULL, '2026-04-09 01:53:01');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `home_content`
+--
+
+CREATE TABLE `home_content` (
+  `id` int NOT NULL,
+  `section` varchar(50) NOT NULL,
+  `title` varchar(255) DEFAULT NULL,
+  `subtitle` varchar(500) DEFAULT NULL,
+  `content` longtext,
+  `icon` varchar(10) DEFAULT NULL,
+  `order_index` int DEFAULT '0',
+  `is_active` tinyint(1) DEFAULT '1',
+  `created_by` int DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_by` int DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- --------------------------------------------------------
 
@@ -163,6 +185,41 @@ INSERT INTO `production` (`id`, `user_id`, `nama_item`, `harga`, `supplier`, `te
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `products`
+--
+
+CREATE TABLE `products` (
+  `id` int NOT NULL,
+  `nama` varchar(100) NOT NULL,
+  `emoji` varchar(10) DEFAULT '?',
+  `harga_default` decimal(12,0) DEFAULT '0',
+  `deskripsi` text,
+  `is_active` tinyint(1) DEFAULT '1',
+  `urutan` int DEFAULT '0',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Dumping data for table `products`
+--
+
+INSERT INTO `products` (`id`, `nama`, `emoji`, `harga_default`, `deskripsi`, `is_active`, `urutan`, `created_at`) VALUES
+(1, 'Cimol', '🫙', '0', 'Cimol goreng renyah khas jajan pasar', 1, 0, '2026-04-29 02:33:38'),
+(2, 'Kentang', '🥔', '0', 'Kentang goreng crispy berbumbu', 1, 1, '2026-04-29 02:33:38'),
+(3, 'Otak-otak', '🐟', '0', 'Otak-otak ikan segar bakar/goreng', 1, 2, '2026-04-29 02:33:38'),
+(4, 'Tahu', '🟡', '0', 'Tahu goreng bumbu spesial', 1, 3, '2026-04-29 02:33:38'),
+(5, 'Sosis', '🌭', '0', 'Sosis goreng berbagai rasa', 1, 4, '2026-04-29 02:33:38'),
+(6, 'Bakso', '🍡', '0', 'Bakso sapi kenyal dan gurih', 1, 5, '2026-04-29 02:33:38'),
+(7, 'Cimol', '🫙', '0', 'Cimol goreng renyah khas jajan pasar', 1, 0, '2026-05-27 14:42:28'),
+(8, 'Kentang', '🥔', '0', 'Kentang goreng crispy berbumbu', 1, 1, '2026-05-27 14:42:28'),
+(9, 'Otak-otak', '🐟', '0', 'Otak-otak ikan segar bakar/goreng', 1, 2, '2026-05-27 14:42:28'),
+(10, 'Tahu', '🟡', '0', 'Tahu goreng bumbu spesial', 1, 3, '2026-05-27 14:42:28'),
+(11, 'Sosis', '🌭', '0', 'Sosis goreng berbagai rasa', 1, 4, '2026-05-27 14:42:28'),
+(12, 'Bakso', '🍡', '0', 'Bakso sapi kenyal dan gurih', 1, 5, '2026-05-27 14:42:28');
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `stock_records`
 --
 
@@ -223,6 +280,22 @@ INSERT INTO `stock_records` (`id`, `user_id`, `tanggal`, `tipe`, `produk`, `juml
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `user_permissions`
+--
+
+CREATE TABLE `user_permissions` (
+  `id` int NOT NULL,
+  `user_id` int NOT NULL,
+  `feature` varchar(50) NOT NULL,
+  `can_create` tinyint(1) DEFAULT '0',
+  `can_read` tinyint(1) DEFAULT '0',
+  `can_update` tinyint(1) DEFAULT '0',
+  `can_delete` tinyint(1) DEFAULT '0'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `users`
 --
 
@@ -232,7 +305,7 @@ CREATE TABLE `users` (
   `email` varchar(100) NOT NULL,
   `phone` varchar(20) NOT NULL,
   `password` varchar(255) NOT NULL,
-  `level` enum('owner','admin','admin_cadangan') DEFAULT 'admin_cadangan',
+  `level` enum('superadmin','owner','admin','admin_cadangan') NOT NULL DEFAULT 'admin',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `branch_id` int DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -245,17 +318,9 @@ INSERT INTO `users` (`id`, `username`, `email`, `phone`, `password`, `level`, `c
 (1, 'Rifat', 'rifatjibranhudaya@gmail.com', '877-7799-4896', '$2y$10$uN1VZowy.hOGCwrunpNYFeCsh/OhHef8ejmwT2a8tHBqWN7SEmIbK', 'owner', '2026-04-07 02:29:42', NULL),
 (2, 'Jibran', 'Jibransixx@gmail.com', '877-7799-4896', '$2y$10$VJxD2FsyI64O63m7T958NubmOnIUtCqi0v2YQsKq1/7s6t9mnq4bm', 'owner', '2026-04-09 01:43:08', NULL),
 (3, 'destiar', 'destiar@gmail.com', '87777994896', '$2y$10$X7DuH/JQwVn7BrnJsUDzK.W6IyCIv4r0zi.HI7tNYBg9PERfzAqx.', 'owner', '2026-04-09 06:45:24', 1),
-(4, 'yosua', 'yosua@gmail.com', '0852123456789', '$2y$10$ml8xUrQQ.wfRBCJ2irJyh.7CEUbS5mD9wUxB7PqXpFRu0Wi3Cxcz.', 'admin_cadangan', '2026-04-14 03:27:00', NULL);
+(4, 'yosua', 'yosua@gmail.com', '0852123456789', '$2y$10$ml8xUrQQ.wfRBCJ2irJyh.7CEUbS5mD9wUxB7PqXpFRu0Wi3Cxcz.', 'owner', '2026-04-14 03:27:00', 1),
+(5, 'owner', 'owner@dapurku.com', '081234567890', '$2y$10$FeWG7Ng7hctT3CX1isI06uUZHRzOiSFKhU307LRw2t/3SAfd2mh6C', 'owner', '2026-04-29 02:33:38', 1);
 
--- --------------------------------------------------------
-
---
--- Table structure for table `wisata`
---
-
-CREATE TABLE `wisata` (
-  `alat` int NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
 -- Indexes for dumped tables
@@ -266,6 +331,14 @@ CREATE TABLE `wisata` (
 --
 ALTER TABLE `branches`
   ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `home_content`
+--
+ALTER TABLE `home_content`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `created_by` (`created_by`),
+  ADD KEY `updated_by` (`updated_by`);
 
 --
 -- Indexes for table `operational`
@@ -299,6 +372,19 @@ ALTER TABLE `production`
   ADD KEY `fk_br_production` (`branch_id`);
 
 --
+-- Indexes for table `products`
+--
+ALTER TABLE `products`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `user_permissions`
+--
+ALTER TABLE `user_permissions`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `user_feature` (`user_id`, `feature`);
+
+--
 -- Indexes for table `stock_records`
 --
 ALTER TABLE `stock_records`
@@ -326,6 +412,12 @@ ALTER TABLE `branches`
   MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
+-- AUTO_INCREMENT for table `home_content`
+--
+ALTER TABLE `home_content`
+  MODIFY `id` int NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `operational`
 --
 ALTER TABLE `operational`
@@ -350,6 +442,18 @@ ALTER TABLE `production`
   MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
+-- AUTO_INCREMENT for table `products`
+--
+ALTER TABLE `products`
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
+
+--
+-- AUTO_INCREMENT for table `user_permissions`
+--
+ALTER TABLE `user_permissions`
+  MODIFY `id` int NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `stock_records`
 --
 ALTER TABLE `stock_records`
@@ -359,11 +463,18 @@ ALTER TABLE `stock_records`
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- Constraints for dumped tables
 --
+
+--
+-- Constraints for table `home_content`
+--
+ALTER TABLE `home_content`
+  ADD CONSTRAINT `home_content_ibfk_1` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `home_content_ibfk_2` FOREIGN KEY (`updated_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
 
 --
 -- Constraints for table `operational`
@@ -404,6 +515,12 @@ ALTER TABLE `stock_records`
 --
 ALTER TABLE `users`
   ADD CONSTRAINT `fk_branch` FOREIGN KEY (`branch_id`) REFERENCES `branches` (`id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `user_permissions`
+--
+ALTER TABLE `user_permissions`
+  ADD CONSTRAINT `fk_perm_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

@@ -26,12 +26,14 @@ requireLogin();
 
 switch ($page) {
     case 'dashboard':        require __DIR__ . '/modules/dashboard/dashboard.php'; break;
+    case 'home_manager':     require __DIR__ . '/modules/home/home_manager.php'; break;
     case 'kasir':            require __DIR__ . '/modules/kasir/kasir.php';         break;
     case 'stok':             require __DIR__ . '/modules/stok/stok.php';           break;
     case 'produksi':         require __DIR__ . '/modules/produksi/produksi.php';   break;
     case 'produksi_detail':  require __DIR__ . '/modules/produksi/produksi_detail.php'; break;
     case 'operasional':      require __DIR__ . '/modules/operasional/operasional.php'; break;
     case 'users':            require __DIR__ . '/modules/users/users.php';         break;
+    case 'akses':            require __DIR__ . '/modules/kelola_akses/kelola_akses.php'; break;
     case 'produk':           require __DIR__ . '/modules/produk/produk.php';       break;
     default:                 require __DIR__ . '/modules/dashboard/dashboard.php'; break;
 }

@@ -1,7 +1,12 @@
 <?php
 // modules/produk/produk.php – Halaman Manajemen Produk
 require_once __DIR__ . '/../../functions.php';
-requireLevel(['owner','admin']);
+requireLogin();
+if (!isOwner() && !hasPermission('produk', 'read')) {
+    flashSet('error', 'Anda tidak memiliki akses ke fitur Produk.');
+    header('Location: index.php?page=dashboard');
+    exit;
+}
 global $conn;
 $u = currentUser();
 
@@ -20,6 +25,14 @@ $where = $showInactive ? '' : 'WHERE is_active=1';
 $products = $conn->query("SELECT * FROM products $where ORDER BY urutan, nama")->fetch_all(MYSQLI_ASSOC);
 $allCount    = $conn->query("SELECT COUNT(*) as c FROM products")->fetch_assoc()['c'];
 $activeCount = $conn->query("SELECT COUNT(*) as c FROM products WHERE is_active=1")->fetch_assoc()['c'];
+
+$branches = $conn->query("SELECT * FROM branches ORDER BY id")->fetch_all(MYSQLI_ASSOC);
+
+$editBranchData = null;
+if (isset($_GET['edit_branch'])) {
+    $ebid = (int)$_GET['edit_branch'];
+    $editBranchData = $conn->query("SELECT * FROM branches WHERE id=$ebid")->fetch_assoc();
+}
 
 $emojis = ['🍢','🫙','🥔','🐟','🟡','🌭','🍡','🍖','🍗','🥩','🍜','🍛','🥗','🧆','🫔','🍱','🥟','🍘','🥮','🧁'];
 
@@ -40,7 +53,10 @@ echo flashGet();
     <a href="?page=produk<?= $showInactive?'':'&show_inactive=1' ?>" class="btn btn-xs btn-secondary">
       <?= $showInactive ? '✅ Tampilkan Aktif Saja' : '👁️ Tampilkan Semua' ?>
     </a>
+    <?php if (isOwner() || hasPermission('produk', 'create')): ?>
+    <button class="btn btn-secondary btn-sm" onclick="toggleForm('formKelolaCabang')">🏠 Kelola Cabang</button>
     <button class="btn btn-primary btn-sm" onclick="toggleForm('formProduk')">➕ Tambah Produk</button>
+    <?php endif; ?>
   </div>
 </div>
 
@@ -130,6 +146,95 @@ echo flashGet();
 </div>
 <?php endif; ?>
 
+<!-- Form Edit Cabang -->
+<?php if ($editBranchData): ?>
+<div class="card mb-3" style="border-color:rgba(59,130,246,.3)">
+  <div class="card-title">✏️ Edit Cabang: <?= htmlspecialchars($editBranchData['nama_cabang']) ?></div>
+  <form method="POST" action="index.php?page=produk">
+    <input type="hidden" name="action" value="branch_edit">
+    <input type="hidden" name="id" value="<?= $editBranchData['id'] ?>">
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Nama Cabang</label>
+        <input type="text" name="nama_cabang" class="form-control" value="<?= htmlspecialchars($editBranchData['nama_cabang']) ?>" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Alamat Cabang</label>
+        <input type="text" name="alamat" class="form-control" value="<?= htmlspecialchars($editBranchData['alamat'] ?? '') ?>">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">🌐 Google Maps Iframe (Opsional)</label>
+      <textarea name="map_url" class="form-control" placeholder="<iframe src='...' ...></iframe>" rows="3"><?= htmlspecialchars($editBranchData['map_url'] ?? '') ?></textarea>
+      <small style="color:var(--text3)">Copy kode embed dari Google Maps (Share -> Embed a map) lalu paste di sini agar muncul di Halaman Utama.</small>
+    </div>
+    <div class="d-flex gap-2">
+      <button type="submit" class="btn btn-primary">💾 Simpan Cabang</button>
+      <a href="index.php?page=produk" class="btn btn-secondary">✕ Batal</a>
+    </div>
+  </form>
+</div>
+<?php endif; ?>
+
+<!-- Form Kelola Cabang -->
+<div id="formKelolaCabang" class="card mb-3" style="<?= $editBranchData ? 'display:none;' : 'display:none;' ?>">
+  <div class="card-title">🏠 Kelola Cabang & Lokasi Maps</div>
+  
+  <div style="margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 20px;">
+    <form method="POST" action="index.php?page=produk" class="d-flex gap-2 align-end flex-wrap">
+      <input type="hidden" name="action" value="branch_add">
+      <div class="form-group" style="margin-bottom:0; flex:1; min-width:200px;">
+        <label class="form-label">Nama Cabang Baru</label>
+        <input type="text" name="nama_cabang" class="form-control" placeholder="Cth: Cabang Sudirman" required>
+      </div>
+      <div class="form-group" style="margin-bottom:0; flex:2; min-width:250px;">
+        <label class="form-label">Alamat Cabang</label>
+        <input type="text" name="alamat" class="form-control" placeholder="Opsional...">
+      </div>
+      <button type="submit" class="btn btn-primary" style="height:42px;">➕ Tambah Cabang</button>
+    </form>
+  </div>
+
+  <table style="width:100%; border-collapse: collapse; font-size:.85rem;">
+    <thead>
+      <tr style="border-bottom: 1px solid var(--border2); text-align: left;">
+        <th style="padding: 10px; color:var(--text3);">#</th>
+        <th style="padding: 10px; color:var(--text3);">Nama Cabang</th>
+        <th style="padding: 10px; color:var(--text3);">Alamat</th>
+        <th style="padding: 10px; color:var(--text3);">Status Maps</th>
+        <th style="padding: 10px; color:var(--text3); text-align:right;">Aksi</th>
+      </tr>
+    </thead>
+    <tbody>
+      <?php if(empty($branches)): ?>
+      <tr><td colspan="5" style="text-align:center; padding:10px; color:var(--text3);">Belum ada cabang terdaftar</td></tr>
+      <?php else: ?>
+        <?php foreach ($branches as $i => $b): ?>
+        <tr style="border-bottom: 1px solid var(--border2);">
+          <td style="padding: 10px;"><?= $i+1 ?></td>
+          <td style="padding: 10px; font-weight:600;"><?= htmlspecialchars($b['nama_cabang']) ?></td>
+          <td style="padding: 10px; color:var(--text2);"><?= htmlspecialchars($b['alamat'] ?: '-') ?></td>
+          <td style="padding: 10px; color:var(--text2);">
+            <?= !empty($b['map_url']) ? '<span style="color:#22C55E">✅ Terpasang</span>' : '<span style="color:#F59E0B">⚠️ Kosong</span>' ?>
+          </td>
+          <td style="padding: 10px; text-align:right;">
+            <a href="?page=produk&edit_branch=<?= $b['id'] ?>" class="btn btn-xs btn-warning">✏️ Edit</a>
+            <form method="POST" action="index.php?page=produk" onsubmit="return confirm('Hapus cabang ini?')" style="display:inline-block;">
+              <input type="hidden" name="action" value="branch_delete">
+              <input type="hidden" name="id" value="<?= $b['id'] ?>">
+              <button type="submit" class="btn btn-xs btn-danger">🗑️ Hapus</button>
+            </form>
+          </td>
+        </tr>
+        <?php endforeach; ?>
+      <?php endif; ?>
+    </tbody>
+  </table>
+  <div class="mt-3">
+    <button type="button" class="btn btn-secondary btn-sm" onclick="toggleForm('formKelolaCabang')">Tutup Kelola Cabang</button>
+  </div>
+</div>
+
 <!-- Grid Produk -->
 <div class="card">
   <div class="card-title">📦 Daftar Produk</div>
@@ -149,6 +254,7 @@ echo flashGet();
       </div>
       <div class="produk-card-desc"><?= htmlspecialchars($p['deskripsi'] ?: '–') ?></div>
       <div class="produk-card-actions">
+        <?php if (isOwner() || hasPermission('produk', 'update')): ?>
         <a href="?page=produk&edit=<?= $p['id'] ?>" class="btn btn-xs btn-warning">✏️</a>
         <form method="POST" style="display:inline">
           <input type="hidden" name="action" value="toggle">
@@ -157,7 +263,8 @@ echo flashGet();
             <?= $p['is_active']?'⏸️':'▶️' ?>
           </button>
         </form>
-        <?php if (isOwner()): ?>
+        <?php endif; ?>
+        <?php if (isOwner() || hasPermission('produk', 'delete')): ?>
         <form method="POST" style="display:inline" onsubmit="return confirm('Hapus produk ini?')">
           <input type="hidden" name="action" value="delete">
           <input type="hidden" name="id" value="<?= $p['id'] ?>">

@@ -1,10 +1,24 @@
 <?php
 // modules/produk/produk_handler.php – CRUD Logic Produk
 require_once __DIR__ . '/../../functions.php';
-requireLevel(['owner','admin']);
+requireLogin();
 global $conn;
 $u = currentUser();
 $action = $_POST['action'] ?? '';
+
+// Security check based on action
+$permRequired = match($action) {
+    'save', 'branch_add' => 'create',
+    'update', 'toggle', 'branch_edit' => 'update',
+    'delete', 'branch_delete' => 'delete',
+    default => 'read'
+};
+
+if (!isOwner() && !hasPermission('produk', $permRequired)) {
+    flashSet('error', "Anda tidak memiliki hak $permRequired untuk Produk.");
+    header('Location: index.php?page=produk');
+    exit;
+}
 
 if ($action === 'save') {
     $nama  = trim($_POST['nama']          ?? '');
@@ -52,11 +66,48 @@ if ($action === 'toggle') {
 }
 
 if ($action === 'delete') {
-    if (!isOwner()) { flashSet('error','Hanya Owner yang bisa menghapus produk.'); header('Location: index.php?page=produk'); exit; }
+    if (!isOwner() && !hasPermission('produk', 'delete')) { flashSet('error','Hanya Owner/Superadmin yang bisa menghapus produk.'); header('Location: index.php?page=produk'); exit; }
     $id = (int)($_POST['id'] ?? 0);
     if ($id) {
         $conn->query("DELETE FROM products WHERE id=$id");
         flashSet('success', 'Produk berhasil dihapus.');
+    }
+    header('Location: index.php?page=produk'); exit;
+}
+
+// ── CRUD Cabang ─────────────────────────────────────────────
+if ($action === 'branch_add') {
+    $nama = trim($_POST['nama_cabang'] ?? '');
+    $almt = trim($_POST['alamat'] ?? '');
+    if ($nama) {
+        $stmt = $conn->prepare("INSERT INTO branches (nama_cabang, alamat) VALUES (?, ?)");
+        $stmt->bind_param('ss', $nama, $almt);
+        $stmt->execute();
+        flashSet('success', "Cabang '$nama' berhasil ditambahkan.");
+    }
+    header('Location: index.php?page=produk'); exit;
+}
+
+if ($action === 'branch_edit') {
+    $id   = (int)($_POST['id'] ?? 0);
+    $nama = trim($_POST['nama_cabang'] ?? '');
+    $almt = trim($_POST['alamat'] ?? '');
+    $map  = trim($_POST['map_url'] ?? '');
+    
+    if ($id && $nama) {
+        $stmt = $conn->prepare("UPDATE branches SET nama_cabang=?, alamat=?, map_url=? WHERE id=?");
+        $stmt->bind_param('sssi', $nama, $almt, $map, $id);
+        $stmt->execute();
+        flashSet('success', "Cabang berhasil diperbarui.");
+    }
+    header('Location: index.php?page=produk'); exit;
+}
+
+if ($action === 'branch_delete') {
+    $id = (int)($_POST['id'] ?? 0);
+    if ($id > 0) {
+        $conn->query("DELETE FROM branches WHERE id=$id");
+        flashSet('success', 'Cabang berhasil dihapus.');
     }
     header('Location: index.php?page=produk'); exit;
 }

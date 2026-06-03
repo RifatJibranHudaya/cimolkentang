@@ -23,7 +23,7 @@ if (isOwner()) {
 $users = $res->fetch_all(MYSQLI_ASSOC);
 
 // Count per level
-$lvlCounts = ['owner' => 0, 'admin' => 0, 'admin_cadangan' => 0];
+$lvlCounts = ['superadmin' => 0, 'owner' => 0, 'admin' => 0, 'admin_cadangan' => 0];
 foreach ($users as $usr) {
     if (isset($lvlCounts[$usr['level']])) $lvlCounts[$usr['level']]++;
 }
@@ -35,6 +35,11 @@ echo flashGet();
 
 <!-- Stats -->
 <div class="d-flex gap-2 flex-wrap mb-3">
+  <?php if ($lvlCounts['superadmin'] > 0 || isSuperadmin()): ?>
+  <span class="user-count-badge" style="background:rgba(255,215,0,.12);color:#FCD34D;border:1px solid rgba(255,215,0,.25)">
+    ⭐ <?= $lvlCounts['superadmin'] ?> Superadmin
+  </span>
+  <?php endif; ?>
   <span class="user-count-badge" style="background:rgba(255,107,0,.12);color:var(--primary);border:1px solid rgba(255,107,0,.25)">
     👑 <?= $lvlCounts['owner'] ?> Owner
   </span>
@@ -53,6 +58,67 @@ echo flashGet();
 <div class="auth-info mb-3" style="background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.18);border-radius:10px;padding:12px 16px;font-size:.84rem;color:#93C5FD">
   💡 <strong>Panduan Owner:</strong> Ubah level pengguna dengan dropdown di kolom Level. Assign cabang untuk Admin/Admin Cadangan agar mereka hanya bisa akses data cabangnya.
 </div>
+
+<!-- Actions -->
+<div class="d-flex gap-2 mb-3">
+  <button class="btn btn-primary btn-sm" onclick="toggleForm('formTambahKaryawan')">➕ Tambah Karyawan</button>
+</div>
+
+<!-- Form Tambah Karyawan -->
+<div id="formTambahKaryawan" class="card mb-3" style="display:none">
+  <div class="card-title">➕ Tambah Karyawan Baru</div>
+  <form method="POST" action="index.php?page=users">
+    <input type="hidden" name="action" value="add_user">
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Username</label>
+        <input type="text" name="username" class="form-control" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input type="email" name="email" class="form-control" required>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">No. HP</label>
+        <input type="text" name="phone" class="form-control" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input type="text" name="password" class="form-control" placeholder="Isi password untuk karyawan ini" required>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Level Akses</label>
+        <select name="level" class="form-control" required>
+          <?php if (isSuperadmin()): ?>
+          <option value="superadmin">⭐ Superadmin</option>
+          <?php endif; ?>
+          <option value="owner">👑 Owner</option>
+          <option value="admin">🛡️ Admin</option>
+          <option value="admin_cadangan" selected>🔵 Admin Cadangan</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Penempatan Cabang</label>
+        <select name="branch_id" class="form-control">
+          <option value="0">Belum Ditentukan (Pusat)</option>
+          <?php foreach ($branches as $b): ?>
+            <option value="<?= $b['id'] ?>"><?= htmlspecialchars($b['nama_cabang']) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+    </div>
+    <div class="d-flex gap-2">
+      <button type="submit" class="btn btn-primary">💾 Simpan Karyawan</button>
+      <button type="button" class="btn btn-secondary" onclick="toggleForm('formTambahKaryawan')">Batal</button>
+    </div>
+  </form>
+</div>
+
+
 <?php endif; ?>
 
 <div class="card">
@@ -65,7 +131,7 @@ echo flashGet();
     <?php foreach ($users as $usr):
       $isMe      = ($usr['id'] == $u['id']);
       $lvl       = $usr['level'];
-      $avCls     = match($lvl) { 'owner' => 'avatar-owner', 'admin' => 'avatar-admin', default => 'avatar-cadangan' };
+      $avCls     = match($lvl) { 'superadmin' => 'avatar-superadmin', 'owner' => 'avatar-owner', 'admin' => 'avatar-admin', default => 'avatar-cadangan' };
       $initial   = strtoupper(mb_substr($usr['username'], 0, 1));
     ?>
     <div class="user-card">
@@ -95,6 +161,9 @@ echo flashGet();
           <input type="hidden" name="action" value="change_level">
           <input type="hidden" name="id" value="<?= $usr['id'] ?>">
           <select name="level" class="level-select" onchange="this.form.submit()" title="Ubah level">
+            <?php if (isSuperadmin()): ?>
+            <option value="superadmin"     <?= $lvl==='superadmin'?'selected':'' ?>>⭐ Superadmin</option>
+            <?php endif; ?>
             <option value="owner"          <?= $lvl==='owner'?'selected':'' ?>>👑 Owner</option>
             <option value="admin"          <?= $lvl==='admin'?'selected':'' ?>>🛡️ Admin</option>
             <option value="admin_cadangan" <?= $lvl==='admin_cadangan'?'selected':'' ?>>🔵 Admin Cadangan</option>
@@ -115,6 +184,7 @@ echo flashGet();
           </select>
         </form>
 
+
         <!-- Hapus -->
         <form method="POST" action="index.php?page=users" onsubmit="return confirm('Hapus pengguna <?= htmlspecialchars(addslashes($usr['username'])) ?>?')">
           <input type="hidden" name="action" value="delete">
@@ -132,5 +202,16 @@ echo flashGet();
   </div>
   <?php endif; ?>
 </div>
+
+
+<script>
+function toggleForm(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const isHidden = el.style.display === 'none' || el.style.display === '';
+  el.style.display = isHidden ? 'block' : 'none';
+  if (isHidden) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+</script>
 
 <?php renderFooter(); ?>
