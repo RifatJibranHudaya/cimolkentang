@@ -3,7 +3,8 @@
 require_once __DIR__ . '/../../functions.php';
 
 if (isLoggedIn()) {
-    header('Location: index.php?page=dashboard');
+    $uid = $GLOBALS['active_user']['id'] ?? '';
+    header('Location: index.php?page=dashboard' . ($uid ? '&uid=' . $uid : ''));
     exit;
 }
 

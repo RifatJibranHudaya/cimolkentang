@@ -238,16 +238,27 @@ function togglePerm(el) {
   fd.append('perm', perm);
   fd.append('value', newVal);
 
-  fetch('modules/kelola_akses/akses_handler.php', { method: 'POST', body: fd })
-    .then(r => r.json())
-    .then(res => {
-      if (!res.success) {
-        el.classList.toggle('active'); // Revert
-        alert(res.msg);
+  fetch('modules/kelola_akses/akses_handler.php', { 
+    method: 'POST', 
+    body: fd,
+    credentials: 'same-origin'
+  })
+    .then(r => r.text())
+    .then(text => {
+      try {
+        const res = JSON.parse(text.substring(text.indexOf('{')));
+        if (!res.success) {
+          el.classList.toggle('active');
+          alert(res.msg);
+        }
+      } catch(e) {
+        el.classList.toggle('active');
+        alert("Terjadi kesalahan pada server saat menyimpan data. Detail: " + e.message + "\\n\\nResponse: " + text.substring(0, 100));
       }
     })
-    .catch(() => {
+    .catch((err) => {
       el.classList.toggle('active'); // Revert
+      alert("Koneksi gagal. Detail: " + err.message);
     });
 }
 
@@ -261,21 +272,33 @@ function toggleBulk(uid, perm, checked) {
   fd.append('perm', perm);
   fd.append('value', val);
 
-  fetch('modules/kelola_akses/akses_handler.php', { method: 'POST', body: fd })
-    .then(r => r.json())
-    .then(res => {
-      if (res.success) {
-        // Update detail chips if open
-        const grid = document.getElementById('detailGrid-' + uid);
-        if (grid) {
-          grid.querySelectorAll(`.detail-perm-chip[data-perm="${perm}"]`).forEach(chip => {
-            if (val) chip.classList.add('active');
-            else     chip.classList.remove('active');
-          });
+  fetch('modules/kelola_akses/akses_handler.php', { 
+    method: 'POST', 
+    body: fd,
+    credentials: 'same-origin'
+  })
+    .then(r => r.text())
+    .then(text => {
+      try {
+        const res = JSON.parse(text.substring(text.indexOf('{')));
+        if (res.success) {
+          // Update detail chips if open
+          const grid = document.getElementById('detailGrid-' + uid);
+          if (grid) {
+            grid.querySelectorAll(`.detail-perm-chip[data-perm="${perm}"]`).forEach(chip => {
+              if (val) chip.classList.add('active');
+              else     chip.classList.remove('active');
+            });
+          }
+        } else {
+          alert(res.msg);
         }
-      } else {
-        alert(res.msg);
+      } catch(e) {
+        alert("Terjadi kesalahan pada server saat menyimpan data. Detail: " + e.message + "\\n\\nResponse: " + text.substring(0, 100));
       }
+    })
+    .catch((err) => {
+      alert("Koneksi gagal. Detail: " + err.message);
     });
 }
 </script>

@@ -29,7 +29,7 @@ $canEdit = isLoggedIn() && in_array($user['level'], ['superadmin', 'owner', 'adm
 <title><?= htmlspecialchars($hero['title'] ?? 'DapurKu - Menu Kami') ?></title>
 <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('fs_theme') || 'dark');</script>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/main.css">
+<link rel="stylesheet" href="assets/css/main.css?v=<?= time() ?>">
 <link rel="stylesheet" href="modules/home/home.css">
 <style>
 body {

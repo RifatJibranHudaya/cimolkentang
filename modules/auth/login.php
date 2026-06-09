@@ -2,9 +2,10 @@
 // modules/auth/login.php – Halaman Login
 require_once __DIR__ . '/../../functions.php';
 
-// Jika sudah login, redirect ke dashboard
-if (isLoggedIn()) {
-    header('Location: index.php?page=dashboard');
+// Jika sudah login, dan tidak sedang menambah akun baru, redirect ke dashboard
+if (isLoggedIn() && empty($_GET['add_account'])) {
+    $uid = $GLOBALS['active_user']['id'] ?? '';
+    header('Location: index.php?page=dashboard' . ($uid ? '&uid=' . $uid : ''));
     exit;
 }
 
@@ -26,10 +27,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $user = $stmt->get_result()->fetch_assoc();
 
         if ($user && password_verify($password, $user['password'])) {
-            $_SESSION['user_id']   = $user['id'];
-            $_SESSION['username']  = $user['username'];
-            $_SESSION['level']     = $user['level'];
-            $_SESSION['branch_id'] = $user['branch_id'];
+            if (empty($_SESSION['accounts'])) {
+                $_SESSION['accounts'] = [];
+            }
+            $_SESSION['accounts'][$user['id']] = [
+                'id'        => $user['id'],
+                'username'  => $user['username'],
+                'level'     => $user['level'],
+                'branch_id' => $user['branch_id']
+            ];
 
             if ($remember) {
                 $token = hash('sha256', $user['password']);
@@ -37,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 setcookie('fs_token', $token,            time() + 86400 * 30, '/', '', false, true);
             }
             flashSet('success', 'Selamat datang kembali, ' . $user['username'] . '! 👋');
-            header('Location: index.php?page=dashboard');
+            header('Location: index.php?page=dashboard&uid=' . $user['id']);
             exit;
         } else {
             $err = 'Username/email atau password salah. Silakan coba lagi.';

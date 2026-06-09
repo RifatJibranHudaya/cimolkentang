@@ -619,7 +619,7 @@ img {
 .form-control,
 .form-select {
   width: 100%;
-  background: rgba(19, 8, 0, .8);
+  background: var(--bg2);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 10px 14px;

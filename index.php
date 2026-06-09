@@ -9,10 +9,23 @@ $page = $_GET['page'] ?? 'home';
 
 // ── Logout ────────────────────────────────────────────────────
 if ($page === 'logout') {
-    session_destroy();
-    setcookie('fs_user',  '', time() - 3600, '/');
-    setcookie('fs_token', '', time() - 3600, '/');
-    header('Location: index.php?page=login');
+    $uid = $_GET['uid'] ?? null;
+    if ($uid && isset($_SESSION['accounts'][$uid])) {
+        unset($_SESSION['accounts'][$uid]);
+    } elseif (isset($GLOBALS['active_user']['id'])) {
+        unset($_SESSION['accounts'][$GLOBALS['active_user']['id']]);
+    }
+
+    if (empty($_SESSION['accounts'])) {
+        session_destroy();
+        setcookie('fs_user',  '', time() - 3600, '/');
+        setcookie('fs_token', '', time() - 3600, '/');
+        header('Location: index.php?page=login');
+    } else {
+        // Jika masih ada akun lain yang aktif login, redirect ke dashboard akun berikutnya
+        $nextUser = reset($_SESSION['accounts']);
+        header('Location: index.php?page=dashboard&uid=' . $nextUser['id']);
+    }
     exit;
 }
 

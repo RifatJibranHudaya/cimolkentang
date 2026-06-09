@@ -2,29 +2,107 @@
 // functions.php – Helper functions dan komponen HTML bersama
 if (session_status() === PHP_SESSION_NONE) session_start();
 
+// Inisialisasi user aktif dinamis untuk mendukung multi-account per tab
+initActiveUser();
+
+// Aktifkan output buffering untuk menyisipkan ?uid=... otomatis ke semua link internal
+ob_start('appendUidToLinks');
+
+function initActiveUser() {
+    // Cari uid dari parameter GET/POST
+    $uid = $_GET['uid'] ?? $_POST['uid'] ?? null;
+
+    // Fallback: cek Referer jika uid tidak ditemukan di URL saat ini
+    if (!$uid && !empty($_SERVER['HTTP_REFERER'])) {
+        $refererQuery = parse_url($_SERVER['HTTP_REFERER'], PHP_URL_QUERY);
+        if ($refererQuery) {
+            parse_str($refererQuery, $refererParams);
+            if (isset($refererParams['uid'])) {
+                $uid = $refererParams['uid'];
+            }
+        }
+    }
+
+    // Pastikan session accounts ada
+    if (empty($_SESSION['accounts'])) {
+        $_SESSION['accounts'] = [];
+    }
+
+    // Migrasi sesi lama (jika ada) ke format baru
+    if (!empty($_SESSION['user_id']) && empty($_SESSION['accounts'][$_SESSION['user_id']])) {
+        $_SESSION['accounts'][$_SESSION['user_id']] = [
+            'id'        => $_SESSION['user_id'],
+            'username'  => $_SESSION['username'] ?? '',
+            'level'     => $_SESSION['level'] ?? 'admin_cadangan',
+            'branch_id' => $_SESSION['branch_id'] ?? null
+        ];
+    }
+
+    $activeUser = null;
+    if ($uid && isset($_SESSION['accounts'][$uid])) {
+        $activeUser = $_SESSION['accounts'][$uid];
+    } elseif (!empty($_SESSION['accounts'])) {
+        // Default ke akun pertama jika tidak ditentukan
+        $activeUser = reset($_SESSION['accounts']);
+    }
+
+    // Auto-login via cookie jika belum ada user aktif
+    if (!$activeUser && !empty($_COOKIE['fs_user']) && !empty($_COOKIE['fs_token'])) {
+        global $conn;
+        if (isset($conn)) {
+            $u = $_COOKIE['fs_user'];
+            $t = $_COOKIE['fs_token'];
+            $stmt = $conn->prepare("SELECT id, username, level, branch_id, password FROM users WHERE username=?");
+            if ($stmt) {
+                $stmt->bind_param('s', $u);
+                $stmt->execute();
+                $row = $stmt->get_result()->fetch_assoc();
+                if ($row && hash('sha256', $row['password']) === $t) {
+                    $activeUser = [
+                        'id'        => $row['id'],
+                        'username'  => $row['username'],
+                        'level'     => $row['level'],
+                        'branch_id' => $row['branch_id']
+                    ];
+                    $_SESSION['accounts'][$row['id']] = $activeUser;
+                }
+            }
+        }
+    }
+
+    $GLOBALS['active_user'] = $activeUser;
+}
+
+// Callback output buffering untuk menambahkan parameter uid ke semua link internal
+function appendUidToLinks(string $buffer): string {
+    if (isset($GLOBALS['active_user']['id'])) {
+        $uid = $GLOBALS['active_user']['id'];
+        return preg_replace_callback(
+            '/\b(href|action)=["\']([^"\']*)["\']/i',
+            function($matches) use ($uid) {
+                $attr = $matches[1];
+                $url = $matches[2];
+                
+                // Cari tahu apakah url internal (tidak memiliki skema/hash)
+                $isExternal = preg_match('/^(https?:|mailto:|tel:|#|javascript:|\/\/)/i', $url);
+                if (!$isExternal && $url !== '') {
+                    if (strpos($url, 'uid=') === false) {
+                        $separator = (strpos($url, '?') === false) ? '?' : '&';
+                        $url .= $separator . 'uid=' . $uid;
+                    }
+                }
+                return $attr . '="' . $url . '"';
+            },
+            $buffer
+        );
+    }
+    return $buffer;
+}
+
 // ─── Auth Helpers ────────────────────────────────────────────
 
 function isLoggedIn(): bool {
-    if (!empty($_SESSION['user_id'])) return true;
-
-    // Auto-login via cookie
-    if (!empty($_COOKIE['fs_user']) && !empty($_COOKIE['fs_token'])) {
-        global $conn;
-        $u = $_COOKIE['fs_user'];
-        $t = $_COOKIE['fs_token'];
-        $stmt = $conn->prepare("SELECT id, username, level, branch_id, password FROM users WHERE username=?");
-        $stmt->bind_param('s', $u);
-        $stmt->execute();
-        $row = $stmt->get_result()->fetch_assoc();
-        if ($row && hash('sha256', $row['password']) === $t) {
-            $_SESSION['user_id']   = $row['id'];
-            $_SESSION['username']  = $row['username'];
-            $_SESSION['level']     = $row['level'];
-            $_SESSION['branch_id'] = $row['branch_id'];
-            return true;
-        }
-    }
-    return false;
+    return !empty($GLOBALS['active_user']);
 }
 
 function requireLogin(string $redirect = 'index.php') {
@@ -36,7 +114,7 @@ function requireLogin(string $redirect = 'index.php') {
 
 function requireLevel(array $levels) {
     requireLogin();
-    $lvl = $_SESSION['level'] ?? '';
+    $lvl = $GLOBALS['active_user']['level'] ?? '';
     if ($lvl === 'superadmin') return; // Superadmin bypasses level checks
     if (!in_array($lvl, $levels)) {
         header("Location: index.php?page=dashboard&err=access");
@@ -46,30 +124,30 @@ function requireLevel(array $levels) {
 
 function currentUser(): array {
     return [
-        'id'        => $_SESSION['user_id']   ?? 0,
-        'username'  => $_SESSION['username']  ?? '',
-        'level'     => $_SESSION['level']     ?? 'admin_cadangan',
-        'branch_id' => $_SESSION['branch_id'] ?? null,
+        'id'        => $GLOBALS['active_user']['id']        ?? 0,
+        'username'  => $GLOBALS['active_user']['username']  ?? '',
+        'level'     => $GLOBALS['active_user']['level']     ?? 'admin_cadangan',
+        'branch_id' => $GLOBALS['active_user']['branch_id'] ?? null,
     ];
 }
 
 function isSuperadmin(): bool {
-    return ($_SESSION['level'] ?? '') === 'superadmin';
+    return ($GLOBALS['active_user']['level'] ?? '') === 'superadmin';
 }
 
 function isOwner(): bool {
-    return in_array($_SESSION['level'] ?? '', ['superadmin', 'owner']); // Treat superadmin as owner for legacy checks
+    return in_array($GLOBALS['active_user']['level'] ?? '', ['superadmin', 'owner']); // Treat superadmin as owner for legacy checks
 }
 
 function isAdmin(): bool {
-    return in_array($_SESSION['level'] ?? '', ['superadmin', 'owner', 'admin']);
+    return in_array($GLOBALS['active_user']['level'] ?? '', ['superadmin', 'owner', 'admin']);
 }
 
 function hasPermission(string $feature, string $action = 'read'): bool {
     if (isSuperadmin()) return true; // Superadmin has all permissions
 
     global $conn;
-    $uid = $_SESSION['user_id'] ?? 0;
+    $uid = $GLOBALS['active_user']['id'] ?? 0;
     if (!$uid) return false;
 
     // Check specific permission
@@ -146,6 +224,30 @@ function renderHeader(string $pageTitle = 'DapurKu POS', string $active = ''): v
     $u     = $user['username'];
     $initial = strtoupper(mb_substr($u, 0, 1));
 
+    // Menghasilkan HTML untuk akun-akun lain yang sedang aktif login
+    $otherAccountsHtml = '';
+    if (!empty($_SESSION['accounts']) && count($_SESSION['accounts']) > 1) {
+        $otherAccountsHtml .= '<div class="other-accounts-list" style="margin-top: 12px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 10px; width: 100%;">';
+        $otherAccountsHtml .= '<div style="font-size: 0.7rem; color: var(--text3); margin-bottom: 6px; font-weight: 600; letter-spacing: 0.5px;">AKUN LAIN:</div>';
+        foreach ($_SESSION['accounts'] as $accId => $acc) {
+            if ($accId == $user['id']) continue;
+            $accInitial = strtoupper(mb_substr($acc['username'], 0, 1));
+            $otherAccountsHtml .= "
+            <a href='index.php?page=dashboard&uid={$accId}' class='other-account-item' style='display: flex; align-items: center; gap: 8px; text-decoration: none; padding: 6px 8px; border-radius: 6px; transition: all 0.2s; margin-bottom: 4px; color: var(--text2);' onmouseover=\"this.style.background='rgba(255,255,255,0.05)'; this.style.color='var(--text1)';\" onmouseout=\"this.style.background='transparent'; this.style.color='var(--text2)';\">
+                <div class='user-avatar-mini' style='width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: white; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: bold; flex-shrink: 0;'>{$accInitial}</div>
+                <div style='font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;'>{$acc['username']} <span style='font-size: 0.65rem; color: var(--text3);'>(" . levelLabel($acc['level']) . ")</span></div>
+            </a>";
+        }
+        $otherAccountsHtml .= '</div>';
+    }
+
+    $addAccountHtml = "
+    <div style='margin-top: 10px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.08); width: 100%; font-size: 0.8rem;'>
+        <a href='index.php?page=login&add_account=1' style='color: var(--accent); text-decoration: none; display: inline-flex; align-items: center; gap: 6px; font-weight: 500; transition: opacity 0.2s;' onmouseover=\"this.style.opacity='0.8'\" onmouseout=\"this.style.opacity='1'\">
+            <span>➕</span> Tambah Akun Baru
+        </a>
+    </div>";
+
     $navItems = [
         'dashboard'   => ['icon' => '🏠', 'label' => 'Dashboard',   'levels' => ['superadmin','owner','admin','admin_cadangan']],
         'kasir'       => ['icon' => '🧾', 'label' => 'Kasir',        'levels' => ['superadmin','owner','admin','admin_cadangan']],
@@ -160,6 +262,13 @@ function renderHeader(string $pageTitle = 'DapurKu POS', string $active = ''): v
     $navHtml = '';
     foreach ($navItems as $key => $item) {
         if (!in_array($user['level'], $item['levels'])) continue;
+        
+        // Cek permission Read untuk menyembunyikan/memunculkan modul dari sidebar
+        // (Dashboard, Users, dan Akses tetap dibiarkan sesuai level)
+        if (in_array($key, ['produk', 'kasir', 'stok', 'produksi', 'operasional'])) {
+            if (!hasPermission($key, 'read')) continue;
+        }
+
         $cls  = ($active === $key) ? 'active' : '';
         $navHtml .= "<a href='index.php?page=$key' class='nav-item $cls'>
             <span class='nav-icon'>{$item['icon']}</span>
@@ -177,7 +286,7 @@ function renderHeader(string $pageTitle = 'DapurKu POS', string $active = ''): v
 <title>{$pageTitle} – DapurKu POS</title>
 <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('fs_theme') || 'dark');</script>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/main.css">
+<link rel="stylesheet" href="assets/css/main.css?v=<?= time() ?>">
 </head>
 <body>
 
@@ -198,17 +307,21 @@ function renderHeader(string $pageTitle = 'DapurKu POS', string $active = ''): v
   <nav class="sidebar-nav">
     {$navHtml}
   </nav>
-  <div class="sidebar-footer">
-    <div class="user-info">
-      <div class="user-avatar">{$initial}</div>
-      <div class="user-details">
-        <div class="user-name">{$u}</div>
-        <div class="user-level">{$lvl}</div>
+  <div class="sidebar-footer" style="display: flex; flex-direction: column; align-items: stretch; height: auto; padding: 15px; border-top: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.12);">
+    <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+      <div class="user-info" style="display: flex; align-items: center; gap: 10px;">
+        <div class="user-avatar" style="width: 36px; height: 36px; border-radius: 50%; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.1rem; flex-shrink: 0;">{$initial}</div>
+        <div class="user-details" style="overflow: hidden;">
+          <div class="user-name" style="font-weight: 600; font-size: 0.9rem; color: var(--text1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{$u}</div>
+          <div class="user-level" style="font-size: 0.72rem; color: var(--text3);">{$lvl}</div>
+        </div>
       </div>
+      <a href="index.php?page=logout" class="logout-btn" title="Keluar" style="text-decoration: none; font-size: 1.25rem; color: var(--text3); transition: color 0.2s;" onmouseover="this.style.color='var(--error)'" onmouseout="this.style.color='var(--text3)'">
+        <span>⏻</span>
+      </a>
     </div>
-    <a href="index.php?page=logout" class="logout-btn" title="Keluar">
-      <span>⏻</span>
-    </a>
+    {$otherAccountsHtml}
+    {$addAccountHtml}
   </div>
 </aside>
 
