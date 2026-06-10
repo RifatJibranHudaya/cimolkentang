@@ -11,9 +11,11 @@ $month = date('Y-m-01');
 
 // Filter by branch kalau bukan owner
 $branchWhere = '';
+$branchWhereJoin = '';
 if (!isOwner() && $u['branch_id']) {
     $bid = (int)$u['branch_id'];
-    $branchWhere = " AND branch_id=$bid";
+    $branchWhere     = " AND branch_id=$bid";
+    $branchWhereJoin = " AND o.branch_id=$bid";
 }
 
 $todayIncome = $conn->query("SELECT COALESCE(SUM(total),0) as t FROM orders WHERE DATE(created_at)='$today'$branchWhere")->fetch_assoc()['t'];
@@ -113,7 +115,7 @@ renderHeader('Dashboard', 'dashboard');
   <div class="card">
     <div class="card-title">🧾 Order Terbaru Hari Ini</div>
     <?php
-    $sql = "SELECT o.*, u.username FROM orders o LEFT JOIN users u ON o.user_id=u.id WHERE DATE(o.created_at)='$today'$branchWhere ORDER BY o.created_at DESC LIMIT 10";
+    $sql = "SELECT o.*, u.username FROM orders o LEFT JOIN users u ON o.user_id=u.id WHERE DATE(o.created_at)='$today'$branchWhereJoin ORDER BY o.created_at DESC LIMIT 10";
     $res = $conn->query($sql);
     if ($res->num_rows === 0):
     ?>

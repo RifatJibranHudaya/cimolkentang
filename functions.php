@@ -5,48 +5,91 @@ if (session_status() === PHP_SESSION_NONE) session_start();
 // Inisialisasi user aktif dinamis untuk mendukung multi-account per tab
 initActiveUser();
 
+// Daftarkan callback untuk otomatis menyisipkan uid pada redirect Location header
+header_register_callback(function() {
+    if (isset($GLOBALS['active_user']['id'])) {
+        $uid = $GLOBALS['active_user']['id'];
+        foreach (headers_list() as $header) {
+            if (stripos($header, 'Location:') === 0) {
+                $url = trim(substr($header, 9));
+                $isExternal = preg_match('/^(https?:|mailto:|tel:|#|javascript:|\/\/)/i', $url);
+                if (!$isExternal && $url !== '') {
+                    if (strpos($url, 'uid=') === false) {
+                        $separator = (strpos($url, '?') === false) ? '?' : '&';
+                        $url .= $separator . 'uid=' . $uid;
+                        header_remove('Location');
+                        header("Location: $url");
+                        break;
+                    }
+                }
+            }
+        }
+    }
+});
+
 // Aktifkan output buffering untuk menyisipkan ?uid=... otomatis ke semua link internal
 ob_start('appendUidToLinks');
 
 function initActiveUser() {
-    // Cari uid dari parameter GET/POST
-    $uid = $_GET['uid'] ?? $_POST['uid'] ?? null;
-
-    // Fallback: cek Referer jika uid tidak ditemukan di URL saat ini
-    if (!$uid && !empty($_SERVER['HTTP_REFERER'])) {
-        $refererQuery = parse_url($_SERVER['HTTP_REFERER'], PHP_URL_QUERY);
-        if ($refererQuery) {
-            parse_str($refererQuery, $refererParams);
-            if (isset($refererParams['uid'])) {
-                $uid = $refererParams['uid'];
-            }
-        }
-    }
+    // Cari uid dari parameter GET/POST saja – TIDAK dari Referer (mencegah kontaminasi lintas tab)
+    $uid = isset($_GET['uid']) ? (int)$_GET['uid'] : (isset($_POST['uid']) ? (int)$_POST['uid'] : null);
 
     // Pastikan session accounts ada
     if (empty($_SESSION['accounts'])) {
         $_SESSION['accounts'] = [];
     }
 
-    // Migrasi sesi lama (jika ada) ke format baru
+    // Migrasi sesi lama tanpa token ke format baru (backwards compat)
     if (!empty($_SESSION['user_id']) && empty($_SESSION['accounts'][$_SESSION['user_id']])) {
         $_SESSION['accounts'][$_SESSION['user_id']] = [
             'id'        => $_SESSION['user_id'],
             'username'  => $_SESSION['username'] ?? '',
             'level'     => $_SESSION['level'] ?? 'admin_cadangan',
-            'branch_id' => $_SESSION['branch_id'] ?? null
+            'branch_id' => $_SESSION['branch_id'] ?? null,
+            'token'     => null, // token kosong – akan divalidasi secara longgar
         ];
     }
 
     $activeUser = null;
+
     if ($uid && isset($_SESSION['accounts'][$uid])) {
-        $activeUser = $_SESSION['accounts'][$uid];
-    } elseif (!empty($_SESSION['accounts'])) {
-        // Default ke akun pertama jika tidak ditentukan
-        $activeUser = reset($_SESSION['accounts']);
+        // uid valid dari URL → validasi token ke DB untuk keamanan
+        $candidate = $_SESSION['accounts'][$uid];
+        if (!empty($candidate['token'])) {
+            // Akun baru dengan token → validasi ke database
+            $activeUser = validateSessionToken($uid, $candidate['token']);
+            if ($activeUser) {
+                // Perbarui data di session (sinkron dengan DB)
+                $_SESSION['accounts'][$uid] = array_merge($candidate, $activeUser);
+                $activeUser = $_SESSION['accounts'][$uid];
+            } else {
+                // Token tidak valid / expired → hapus akun dari sesi
+                unset($_SESSION['accounts'][$uid]);
+            }
+        } else {
+            // Akun lama tanpa token (migrasi) → percaya session saja
+            $activeUser = $candidate;
+        }
+    } elseif ($uid === null && !empty($_SESSION['accounts'])) {
+        // Tidak ada uid di URL → pakai akun pertama yang valid
+        foreach ($_SESSION['accounts'] as $accId => $candidate) {
+            if (!empty($candidate['token'])) {
+                $validated = validateSessionToken($accId, $candidate['token']);
+                if ($validated) {
+                    $activeUser = array_merge($candidate, $validated);
+                    $_SESSION['accounts'][$accId] = $activeUser;
+                    break;
+                } else {
+                    unset($_SESSION['accounts'][$accId]);
+                }
+            } else {
+                $activeUser = $candidate;
+                break;
+            }
+        }
     }
 
-    // Auto-login via cookie jika belum ada user aktif
+    // Auto-login via cookie jika belum ada user aktif sama sekali
     if (!$activeUser && !empty($_COOKIE['fs_user']) && !empty($_COOKIE['fs_token'])) {
         global $conn;
         if (isset($conn)) {
@@ -58,11 +101,21 @@ function initActiveUser() {
                 $stmt->execute();
                 $row = $stmt->get_result()->fetch_assoc();
                 if ($row && hash('sha256', $row['password']) === $t) {
+                    // Auto-login via cookie: buat token baru di DB
+                    $newToken = bin2hex(random_bytes(32));
+                    $del = $conn->prepare("DELETE FROM user_sessions WHERE user_id=?");
+                    $del->bind_param('i', $row['id']);
+                    $del->execute();
+                    $ins = $conn->prepare("INSERT INTO user_sessions (user_id, token) VALUES (?, ?)");
+                    $ins->bind_param('is', $row['id'], $newToken);
+                    $ins->execute();
+
                     $activeUser = [
                         'id'        => $row['id'],
                         'username'  => $row['username'],
                         'level'     => $row['level'],
-                        'branch_id' => $row['branch_id']
+                        'branch_id' => $row['branch_id'],
+                        'token'     => $newToken,
                     ];
                     $_SESSION['accounts'][$row['id']] = $activeUser;
                 }
@@ -73,29 +126,67 @@ function initActiveUser() {
     $GLOBALS['active_user'] = $activeUser;
 }
 
-// Callback output buffering untuk menambahkan parameter uid ke semua link internal
+// Validasi token akun ke database
+function validateSessionToken(int $userId, string $token): ?array {
+    global $conn;
+    if (!isset($conn)) return null;
+
+    $stmt = $conn->prepare(
+        "SELECT u.id, u.username, u.level, u.branch_id 
+         FROM user_sessions s 
+         JOIN users u ON u.id = s.user_id 
+         WHERE s.user_id=? AND s.token=?
+         LIMIT 1"
+    );
+    if (!$stmt) return null;
+    $stmt->bind_param('is', $userId, $token);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    if (!$row) return null;
+
+    // Perbarui last_active
+    $upd = $conn->prepare("UPDATE user_sessions SET last_active=NOW() WHERE user_id=? AND token=?");
+    $upd->bind_param('is', $userId, $token);
+    $upd->execute();
+
+    return $row;
+}
+
+// Callback output buffering: sisipkan uid ke href/action DAN hidden input di setiap <form>
 function appendUidToLinks(string $buffer): string {
-    if (isset($GLOBALS['active_user']['id'])) {
-        $uid = $GLOBALS['active_user']['id'];
-        return preg_replace_callback(
-            '/\b(href|action)=["\']([^"\']*)["\']/i',
-            function($matches) use ($uid) {
-                $attr = $matches[1];
-                $url = $matches[2];
-                
-                // Cari tahu apakah url internal (tidak memiliki skema/hash)
-                $isExternal = preg_match('/^(https?:|mailto:|tel:|#|javascript:|\/\/)/i', $url);
-                if (!$isExternal && $url !== '') {
-                    if (strpos($url, 'uid=') === false) {
-                        $separator = (strpos($url, '?') === false) ? '?' : '&';
-                        $url .= $separator . 'uid=' . $uid;
-                    }
-                }
-                return $attr . '="' . $url . '"';
-            },
-            $buffer
-        );
-    }
+    if (!isset($GLOBALS['active_user']['id'])) return $buffer;
+
+    $uid = (int)$GLOBALS['active_user']['id'];
+
+    // 1. Tambahkan ?uid=X ke semua href dan action internal
+    $buffer = preg_replace_callback(
+        '/\b(href|action)=(["\'])([^"\']*)(\2)/i',
+        function($m) use ($uid) {
+            $attr  = $m[1];
+            $quote = $m[2];
+            $url   = $m[3];
+            $isExternal = preg_match('/^(https?:|mailto:|tel:|#|javascript:|\/\/)/i', $url);
+            if (!$isExternal && $url !== '' && strpos($url, 'uid=') === false) {
+                $sep = strpos($url, '?') === false ? '?' : '&';
+                $url .= $sep . 'uid=' . $uid;
+            }
+            return $attr . '=' . $quote . $url . $quote;
+        },
+        $buffer
+    );
+
+    // 2. Sisipkan hidden <input name="uid"> ke dalam setiap <form> yang belum punya
+    $buffer = preg_replace_callback(
+        '/<form(\s[^>]*)?(>)/i',
+        function($m) use ($uid) {
+            // Jangan tambah jika form sudah punya uid (misal dari action URL)
+            // Tetap tambahkan hidden field agar POST request juga membawa uid
+            return '<form' . ($m[1] ?? '') . $m[2]
+                 . '<input type="hidden" name="uid" value="' . $uid . '">';
+        },
+        $buffer
+    );
+
     return $buffer;
 }
 
@@ -249,14 +340,15 @@ function renderHeader(string $pageTitle = 'DapurKu POS', string $active = ''): v
     </div>";
 
     $navItems = [
-        'dashboard'   => ['icon' => '🏠', 'label' => 'Dashboard',   'levels' => ['superadmin','owner','admin','admin_cadangan']],
-        'kasir'       => ['icon' => '🧾', 'label' => 'Kasir',        'levels' => ['superadmin','owner','admin','admin_cadangan']],
-        'produk'      => ['icon' => '🍔', 'label' => 'Produk',       'levels' => ['superadmin','owner','admin','admin_cadangan']],
-        'stok'        => ['icon' => '📦', 'label' => 'Stok',         'levels' => ['superadmin','owner','admin','admin_cadangan']],
-        'produksi'    => ['icon' => '🛒', 'label' => 'Produksi',     'levels' => ['superadmin','owner','admin','admin_cadangan']],
-        'operasional' => ['icon' => '🔧', 'label' => 'Operasional',  'levels' => ['superadmin','owner','admin']],
-        'users'       => ['icon' => '👥', 'label' => 'Pengguna',     'levels' => ['superadmin','owner','admin','admin_cadangan']],
-        'akses'       => ['icon' => '🔑', 'label' => 'Kelola Akses', 'levels' => ['superadmin']],
+        'dashboard'    => ['icon' => '🏠', 'label' => 'Dashboard',      'levels' => ['superadmin','owner','admin','admin_cadangan']],
+        'kasir'        => ['icon' => '🧾', 'label' => 'Kasir',           'levels' => ['superadmin','owner','admin','admin_cadangan']],
+        'produk'       => ['icon' => '🍔', 'label' => 'Produk',          'levels' => ['superadmin','owner','admin','admin_cadangan']],
+        'stok'         => ['icon' => '📦', 'label' => 'Stok',            'levels' => ['superadmin','owner','admin','admin_cadangan']],
+        'produksi'     => ['icon' => '🛒', 'label' => 'Produksi',        'levels' => ['superadmin','owner','admin','admin_cadangan']],
+        'operasional'  => ['icon' => '🔧', 'label' => 'Operasional',     'levels' => ['superadmin','owner','admin']],
+        'home_manager' => ['icon' => '📝', 'label' => 'Kelola Konten',   'levels' => ['superadmin','owner','admin']],
+        'users'        => ['icon' => '👥', 'label' => 'Pengguna',        'levels' => ['superadmin','owner','admin','admin_cadangan']],
+        'akses'        => ['icon' => '🔑', 'label' => 'Kelola Akses',    'levels' => ['superadmin']],
     ];
 
     $navHtml = '';

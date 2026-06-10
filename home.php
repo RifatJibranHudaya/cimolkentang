@@ -147,7 +147,50 @@ body {
         <div class="pro-header-actions">
             <button class="theme-toggle" onclick="toggleTheme()" id="themeIcon" aria-label="Toggle Theme">☀️</button>
             <?php if ($loggedIn): ?>
-                <a href="index.php?page=dashboard" class="btn-primary">Dashboard →</a>
+                <?php
+                $accounts = $_SESSION['accounts'] ?? [];
+                $multiAccount = count($accounts) > 1;
+                ?>
+                <?php if ($multiAccount): ?>
+                <div class="account-switcher-wrap" style="position:relative; display:inline-block;">
+                    <button class="btn-primary" onclick="toggleAccountMenu()" style="display:flex;align-items:center;gap:6px;">
+                        Dashboard ▾
+                    </button>
+                    <div id="accountDropdown" style="display:none; position:absolute; right:0; top:calc(100% + 8px); background:var(--card); border:1px solid var(--border); border-radius:10px; min-width:200px; box-shadow:0 8px 30px rgba(0,0,0,0.3); overflow:hidden; z-index:999;">
+                        <?php foreach ($accounts as $acc): ?>
+                        <a href="index.php?page=dashboard&uid=<?= $acc['id'] ?>"
+                           style="display:flex;align-items:center;gap:10px;padding:12px 16px;text-decoration:none;color:var(--text);transition:background 0.2s;"
+                           onmouseover="this.style.background='var(--border2)'" onmouseout="this.style.background='transparent'">
+                            <div style="width:30px;height:30px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:0.85rem;flex-shrink:0;">
+                                <?= strtoupper(mb_substr($acc['username'], 0, 1)) ?>
+                            </div>
+                            <div>
+                                <div style="font-weight:600;font-size:0.9rem;"><?= htmlspecialchars($acc['username']) ?></div>
+                                <div style="font-size:0.72rem;color:var(--text3);"><?= levelLabel($acc['level']) ?></div>
+                            </div>
+                        </a>
+                        <?php endforeach; ?>
+                        <div style="border-top:1px solid var(--border2);padding:8px 16px;">
+                            <a href="index.php?page=login&add_account=1" style="font-size:0.8rem;color:var(--accent);display:flex;align-items:center;gap:6px;text-decoration:none;">➕ Tambah Akun</a>
+                        </div>
+                    </div>
+                </div>
+                <script>
+                function toggleAccountMenu() {
+                    const d = document.getElementById('accountDropdown');
+                    d.style.display = d.style.display === 'none' ? 'block' : 'none';
+                }
+                document.addEventListener('click', function(e) {
+                    const wrap = document.querySelector('.account-switcher-wrap');
+                    if (wrap && !wrap.contains(e.target)) {
+                        document.getElementById('accountDropdown').style.display = 'none';
+                    }
+                });
+                </script>
+                <?php else: ?>
+                    <?php $onlyUid = !empty($accounts) ? array_key_first($accounts) : ''; ?>
+                    <a href="index.php?page=dashboard<?= $onlyUid ? '&uid='.$onlyUid : '' ?>" class="btn-primary">Dashboard →</a>
+                <?php endif; ?>
             <?php else: ?>
                 <a href="index.php?page=login" class="btn-primary">Login</a>
             <?php endif; ?>
@@ -155,18 +198,7 @@ body {
     </div>
 </header>
 
-<!-- Edit Panel (Visible to Owner & Admin) -->
-<?php if ($canEdit): ?>
-<div class="edit-panel">
-    <span class="edit-panel-text">✏️ Anda adalah <?= ucfirst(str_replace('_', ' ', $user['level'])) ?>. Kelola konten home page</span>
-    <div>
-        <a href="index.php?page=home_manager">Kelola Konten</a>
-        <?php if (in_array($user['level'], ['superadmin', 'owner'])): ?>
-        <a href="index.php?page=produk" style="background: var(--secondary); margin-left: 10px;">Kelola Produk</a>
-        <?php endif; ?>
-    </div>
-</div>
-<?php endif; ?>
+
 
 <!-- Professional Hero Section -->
 <section class="pro-hero" id="hero">

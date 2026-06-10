@@ -9,11 +9,25 @@ $page = $_GET['page'] ?? 'home';
 
 // ── Logout ────────────────────────────────────────────────────
 if ($page === 'logout') {
-    $uid = $_GET['uid'] ?? null;
+    global $conn;
+    $uid = isset($_GET['uid']) ? (int)$_GET['uid'] : null;
+
+    // Tentukan uid yang akan di-logout
+    $targetUid = null;
     if ($uid && isset($_SESSION['accounts'][$uid])) {
-        unset($_SESSION['accounts'][$uid]);
+        $targetUid = $uid;
     } elseif (isset($GLOBALS['active_user']['id'])) {
-        unset($_SESSION['accounts'][$GLOBALS['active_user']['id']]);
+        $targetUid = (int)$GLOBALS['active_user']['id'];
+    }
+
+    if ($targetUid) {
+        // Hapus token dari DB agar tidak bisa dipakai lagi
+        if (isset($conn)) {
+            $del = $conn->prepare("DELETE FROM user_sessions WHERE user_id=?");
+            $del->bind_param('i', $targetUid);
+            $del->execute();
+        }
+        unset($_SESSION['accounts'][$targetUid]);
     }
 
     if (empty($_SESSION['accounts'])) {
@@ -22,7 +36,7 @@ if ($page === 'logout') {
         setcookie('fs_token', '', time() - 3600, '/');
         header('Location: index.php?page=login');
     } else {
-        // Jika masih ada akun lain yang aktif login, redirect ke dashboard akun berikutnya
+        // Masih ada akun lain yang aktif login
         $nextUser = reset($_SESSION['accounts']);
         header('Location: index.php?page=dashboard&uid=' . $nextUser['id']);
     }

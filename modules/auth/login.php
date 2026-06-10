@@ -1,5 +1,6 @@
 <?php
 // modules/auth/login.php – Halaman Login
+require_once __DIR__ . '/../../db.php';
 require_once __DIR__ . '/../../functions.php';
 
 // Jika sudah login, dan tidak sedang menambah akun baru, redirect ke dashboard
@@ -30,18 +31,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (empty($_SESSION['accounts'])) {
                 $_SESSION['accounts'] = [];
             }
+
+            // Generate token unik untuk sesi akun ini
+            $token = bin2hex(random_bytes(32));
+
+            // Hapus token lama untuk user ini (jika ada) dan simpan yang baru
+            $delStmt = $conn->prepare("DELETE FROM user_sessions WHERE user_id=?");
+            $delStmt->bind_param('i', $user['id']);
+            $delStmt->execute();
+
+            $insStmt = $conn->prepare("INSERT INTO user_sessions (user_id, token) VALUES (?, ?)");
+            $insStmt->bind_param('is', $user['id'], $token);
+            $insStmt->execute();
+
+            // Simpan ke session accounts termasuk token
             $_SESSION['accounts'][$user['id']] = [
                 'id'        => $user['id'],
                 'username'  => $user['username'],
                 'level'     => $user['level'],
-                'branch_id' => $user['branch_id']
+                'branch_id' => $user['branch_id'],
+                'token'     => $token,
             ];
 
             if ($remember) {
-                $token = hash('sha256', $user['password']);
+                $remToken = hash('sha256', $user['password']);
                 setcookie('fs_user',  $user['username'], time() + 86400 * 30, '/', '', false, true);
-                setcookie('fs_token', $token,            time() + 86400 * 30, '/', '', false, true);
+                setcookie('fs_token', $remToken,         time() + 86400 * 30, '/', '', false, true);
             }
+
             flashSet('success', 'Selamat datang kembali, ' . $user['username'] . '! 👋');
             header('Location: index.php?page=dashboard&uid=' . $user['id']);
             exit;
@@ -82,7 +99,7 @@ $flash = flashGet();
       <div class="auth-flash error">⚠️ <?= htmlspecialchars($err) ?></div>
     <?php endif; ?>
 
-    <form method="POST" action="index.php?page=login" autocomplete="on">
+    <form method="POST" action="index.php?page=login<?= !empty($_GET['add_account']) ? '&add_account=1' : '' ?>" autocomplete="on">
 
       <div class="auth-form-group">
         <label class="auth-form-label" for="identifier">👤 Username atau Email</label>

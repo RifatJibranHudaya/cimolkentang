@@ -93,3 +93,74 @@ function updateThemeIcon(theme) {
     icon.textContent = theme === 'light' ? '🌙' : '☀️';
   }
 }
+
+// ── UID Interceptor (Multi-Account Tab Isolation) ─────────────
+// Membaca uid dari URL saat ini dan menyisipkan ke semua link/form
+// agar setiap tab tetap menggunakan akunnya sendiri
+(function injectUid() {
+  var uid = new URLSearchParams(window.location.search).get('uid');
+  if (!uid) return;
+
+  function addUidToUrl(url) {
+    if (!url || /^(https?:|mailto:|tel:|#|javascript:|\/\/)/i.test(url)) return url;
+    if (url.indexOf('uid=') !== -1) return url;
+    return url + (url.indexOf('?') !== -1 ? '&' : '?') + 'uid=' + uid;
+  }
+
+  function patchLinks(root) {
+    if (!root || !root.querySelectorAll) return;
+    root.querySelectorAll('a[href]').forEach(function(a) {
+      var orig = a.getAttribute('href');
+      var patched = addUidToUrl(orig);
+      if (patched !== orig) a.setAttribute('href', patched);
+    });
+  }
+
+  function patchForms(root) {
+    if (!root || !root.querySelectorAll) return;
+    root.querySelectorAll('form').forEach(function(form) {
+      if (!form.querySelector('input[name="uid"]')) {
+        var inp = document.createElement('input');
+        inp.type = 'hidden';
+        inp.name = 'uid';
+        inp.value = uid;
+        form.prepend(inp);
+      }
+    });
+  }
+
+  // Patch saat DOM siap
+  function runPatch() {
+    patchLinks(document);
+    patchForms(document);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', runPatch);
+  } else {
+    runPatch();
+  }
+
+  // Observer untuk elemen yang dibuat secara dinamis (modal, AJAX, dll)
+  var observer = new MutationObserver(function(mutations) {
+    mutations.forEach(function(m) {
+      m.addedNodes.forEach(function(node) {
+        if (node.nodeType !== 1) return;
+        patchLinks(node);
+        patchForms(node);
+      });
+    });
+  });
+
+  function startObserver() {
+    if (document.body) {
+      observer.observe(document.body, { childList: true, subtree: true });
+    }
+  }
+
+  if (document.body) {
+    startObserver();
+  } else {
+    document.addEventListener('DOMContentLoaded', startObserver);
+  }
+})();

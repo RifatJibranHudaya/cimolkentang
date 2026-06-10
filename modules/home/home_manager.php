@@ -407,7 +407,7 @@ function openEditModal(id) {
     document.getElementById('contentId').value = id;
     
     // Fetch content data
-    fetch('index.php?page=home_manager', {
+    fetch('modules/home/home_handler.php', {
         method: 'POST',
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: 'action=get_by_id&id=' + id
