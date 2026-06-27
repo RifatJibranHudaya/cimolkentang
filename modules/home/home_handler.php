@@ -5,8 +5,8 @@ require_once __DIR__ . '/../../functions.php';
 
 $user = currentUser();
 
-// Only owner and admin (not admin_cadangan) can manage home content
-if (!in_array($user['level'], ['owner', 'admin'])) {
+// Only superadmin, owner, and admin can manage home content
+if (!in_array($user['level'], ['superadmin', 'owner', 'admin'])) {
     die(json_encode(['success' => false, 'msg' => 'Akses ditolak!']));
 }
 
@@ -22,10 +22,6 @@ if ($action === 'create') {
     $icon       = safePost('icon', '⭐');
     $order_idx  = (int)($_POST['order_index'] ?? 0);
     
-    if (empty($title)) {
-        die(json_encode(['success' => false, 'msg' => 'Judul tidak boleh kosong!']));
-    }
-    
     $stmt = $conn->prepare(
         "INSERT INTO home_content (section, title, subtitle, content, icon, order_index, created_by, is_active)
          VALUES (?, ?, ?, ?, ?, ?, ?, 1)"
@@ -33,6 +29,8 @@ if ($action === 'create') {
     $stmt->bind_param('ssssiii', $section, $title, $subtitle, $content, $icon, $order_idx, $user['id']);
     
     if ($stmt->execute()) {
+        $newId = $conn->insert_id;
+        logActivity('create', 'home_content', $newId, "Menambah konten: $title (section: $section)");
         flashSet('success', 'Konten berhasil ditambahkan!');
         die(json_encode(['success' => true, 'msg' => 'Konten berhasil ditambahkan!']));
     } else {
@@ -62,22 +60,29 @@ if ($action === 'get_by_id') {
 
 // ─── UPDATE ──────────────────────────────────────────────────
 if ($action === 'update') {
-    $id         = (int)($_POST['id'] ?? 0);
-    $section    = safePost('section', 'feature');
-    $title      = safePost('title');
-    $subtitle   = safePost('subtitle');
-    $content    = isset($_POST['content']) ? trim($_POST['content']) : '';
-    $icon       = safePost('icon', '⭐');
-    $order_idx  = (int)($_POST['order_index'] ?? 0);
-    $is_active  = isset($_POST['is_active']) ? 1 : 0;
+    $id = (int)($_POST['id'] ?? 0);
     
     if ($id <= 0) {
         die(json_encode(['success' => false, 'msg' => 'ID tidak valid!']));
     }
-    
-    if (empty($title)) {
-        die(json_encode(['success' => false, 'msg' => 'Judul tidak boleh kosong!']));
+
+    // Fetch existing content to preserve fields on partial updates (e.g. toggleActive status)
+    $fetchStmt = $conn->prepare("SELECT * FROM home_content WHERE id = ?");
+    $fetchStmt->bind_param('i', $id);
+    $fetchStmt->execute();
+    $existing = $fetchStmt->get_result()->fetch_assoc();
+
+    if (!$existing) {
+        die(json_encode(['success' => false, 'msg' => 'Konten tidak ditemukan!']));
     }
+
+    $section    = isset($_POST['section']) ? safePost('section') : $existing['section'];
+    $title      = isset($_POST['title']) ? safePost('title') : $existing['title'];
+    $subtitle   = isset($_POST['subtitle']) ? safePost('subtitle') : $existing['subtitle'];
+    $content    = isset($_POST['content']) ? trim($_POST['content']) : $existing['content'];
+    $icon       = isset($_POST['icon']) ? safePost('icon') : $existing['icon'];
+    $order_idx  = isset($_POST['order_index']) ? (int)$_POST['order_index'] : (int)$existing['order_index'];
+    $is_active  = isset($_POST['is_active']) ? (int)$_POST['is_active'] : (int)$existing['is_active'];
     
     $stmt = $conn->prepare(
         "UPDATE home_content 
@@ -85,9 +90,10 @@ if ($action === 'update') {
              order_index = ?, is_active = ?, updated_by = ?, updated_at = NOW()
          WHERE id = ?"
     );
-    $stmt->bind_param('sssssiiiii', $section, $title, $subtitle, $content, $icon, $order_idx, $is_active, $user['id'], $id);
+    $stmt->bind_param('sssssiiii', $section, $title, $subtitle, $content, $icon, $order_idx, $is_active, $user['id'], $id);
     
     if ($stmt->execute()) {
+        logActivity('update', 'home_content', $id, "Memperbarui konten ID:$id");
         flashSet('success', 'Konten berhasil diperbarui!');
         die(json_encode(['success' => true, 'msg' => 'Konten berhasil diperbarui!']));
     } else {
@@ -118,6 +124,7 @@ if ($action === 'delete') {
     $stmt->bind_param('ii', $user['id'], $id);
     
     if ($stmt->execute()) {
+        logActivity('delete', 'home_content', $id, "Menghapus konten ID:$id");
         flashSet('success', 'Konten berhasil dihapus!');
         die(json_encode(['success' => true, 'msg' => 'Konten berhasil dihapus!']));
     } else {

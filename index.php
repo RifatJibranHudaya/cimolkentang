@@ -21,6 +21,17 @@ if ($page === 'logout') {
     }
 
     if ($targetUid) {
+        // Log aktivitas logout sebelum session dihapus
+        $logUsername = $_SESSION['accounts'][$targetUid]['username'] ?? 'unknown';
+        if (isset($conn)) {
+            $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+            $logStmt = $conn->prepare(
+                "INSERT INTO activity_logs (user_id, username, action, module, description, ip_address) VALUES (?, ?, 'logout', 'auth', 'User logged out', ?)"
+            );
+            $logStmt->bind_param('iss', $targetUid, $logUsername, $ip);
+            $logStmt->execute();
+        }
+
         // Hapus token dari DB agar tidak bisa dipakai lagi
         if (isset($conn)) {
             $del = $conn->prepare("DELETE FROM user_sessions WHERE user_id=?");
@@ -61,6 +72,7 @@ switch ($page) {
     case 'operasional':      require __DIR__ . '/modules/operasional/operasional.php'; break;
     case 'users':            require __DIR__ . '/modules/users/users.php';         break;
     case 'akses':            require __DIR__ . '/modules/kelola_akses/kelola_akses.php'; break;
+    case 'activity_log':     require __DIR__ . '/modules/activity_log/activity_log.php'; break;
     case 'produk':           require __DIR__ . '/modules/produk/produk.php';       break;
     default:                 require __DIR__ . '/modules/dashboard/dashboard.php'; break;
 }

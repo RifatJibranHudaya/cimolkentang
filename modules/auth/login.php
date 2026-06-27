@@ -60,6 +60,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             flashSet('success', 'Selamat datang kembali, ' . $user['username'] . '! 👋');
+
+            // Log aktivitas login
+            $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+            $logStmt = $conn->prepare(
+                "INSERT INTO activity_logs (user_id, username, action, module, description, ip_address) VALUES (?, ?, 'login', 'auth', 'User logged in', ?)"
+            );
+            $logStmt->bind_param('iss', $user['id'], $user['username'], $ip);
+            $logStmt->execute();
+
             header('Location: index.php?page=dashboard&uid=' . $user['id']);
             exit;
         } else {

@@ -360,12 +360,12 @@ renderHeader('Kelola Home Page', 'home_manager');
 
             <div class="form-group">
                 <label>Judul / Nama</label>
-                <input type="text" id="title" placeholder="Masukkan judul..." required>
+                <input type="text" id="title" placeholder="Masukkan judul...">
             </div>
 
             <div class="form-group">
                 <label>Subtitle / Deskripsi Singkat</label>
-                <input type="text" id="subtitle" placeholder="Masukkan subtitle..." required>
+                <input type="text" id="subtitle" placeholder="Masukkan subtitle...">
             </div>
 
             <div class="form-group">

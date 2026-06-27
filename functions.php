@@ -156,6 +156,25 @@ function validateSessionToken(int $userId, string $token): ?array {
 function appendUidToLinks(string $buffer): string {
     if (!isset($GLOBALS['active_user']['id'])) return $buffer;
 
+    // Skip if buffer looks like JSON or is empty
+    $trimmed = trim($buffer);
+    if ($trimmed === '') return $buffer;
+    if (($trimmed[0] === '{' && substr($trimmed, -1) === '}') || 
+        ($trimmed[0] === '[' && substr($trimmed, -1) === ']')) {
+        return $buffer;
+    }
+
+    // Skip processing if Content-Type header is JSON, JavaScript, or CSS
+    foreach (headers_list() as $header) {
+        if (stripos($header, 'Content-Type:') === 0) {
+            if (stripos($header, 'json') !== false || 
+                stripos($header, 'javascript') !== false || 
+                stripos($header, 'css') !== false) {
+                return $buffer;
+            }
+        }
+    }
+
     $uid = (int)$GLOBALS['active_user']['id'];
 
     // 1. Tambahkan ?uid=X ke semua href dan action internal
@@ -257,6 +276,25 @@ function hasPermission(string $feature, string $action = 'read'): bool {
     return !empty($res[$col]);
 }
 
+// ─── Activity Log ────────────────────────────────────────────
+
+function logActivity(string $action, string $module, ?int $targetId = null, string $description = ''): void {
+    global $conn;
+    if (!isset($conn)) return;
+
+    $user = currentUser();
+    $userId = $user['id'] ?: null;
+    $username = $user['username'] ?: 'system';
+    $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+
+    $stmt = $conn->prepare(
+        "INSERT INTO activity_logs (user_id, username, action, module, target_id, description, ip_address)
+         VALUES (?, ?, ?, ?, ?, ?, ?)"
+    );
+    $stmt->bind_param('isssiss', $userId, $username, $action, $module, $targetId, $description, $ip);
+    $stmt->execute();
+}
+
 function levelLabel(string $l): string {
     return match($l) {
         'superadmin'     => '⭐ Superadmin',
@@ -346,9 +384,10 @@ function renderHeader(string $pageTitle = 'DapurKu POS', string $active = ''): v
         'stok'         => ['icon' => '📦', 'label' => 'Stok',            'levels' => ['superadmin','owner','admin','admin_cadangan']],
         'produksi'     => ['icon' => '🛒', 'label' => 'Produksi',        'levels' => ['superadmin','owner','admin','admin_cadangan']],
         'operasional'  => ['icon' => '🔧', 'label' => 'Operasional',     'levels' => ['superadmin','owner','admin']],
-        'home_manager' => ['icon' => '📝', 'label' => 'Kelola Konten',   'levels' => ['superadmin','owner','admin']],
-        'users'        => ['icon' => '👥', 'label' => 'Pengguna',        'levels' => ['superadmin','owner','admin','admin_cadangan']],
-        'akses'        => ['icon' => '🔑', 'label' => 'Kelola Akses',    'levels' => ['superadmin']],
+        'home_manager'  => ['icon' => '📝', 'label' => 'Kelola Konten',   'levels' => ['superadmin','owner','admin']],
+        'users'         => ['icon' => '👥', 'label' => 'Pengguna',        'levels' => ['superadmin','owner','admin','admin_cadangan']],
+        'akses'         => ['icon' => '🔑', 'label' => 'Kelola Akses',    'levels' => ['superadmin']],
+        'activity_log'  => ['icon' => '📊', 'label' => 'Log Aktivitas',   'levels' => ['superadmin','owner']],
     ];
 
     $navHtml = '';
