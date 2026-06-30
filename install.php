@@ -28,6 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 `id` INT AUTO_INCREMENT PRIMARY KEY,
                 `nama_cabang` VARCHAR(100) NOT NULL,
                 `alamat` TEXT,
+                `map_url` TEXT DEFAULT NULL,
                 `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             ) ENGINE=InnoDB",
 
@@ -37,10 +38,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 `email` VARCHAR(100) UNIQUE NOT NULL,
                 `phone` VARCHAR(20) NOT NULL,
                 `password` VARCHAR(255) NOT NULL,
-                `level` ENUM('owner','admin','admin_cadangan') DEFAULT 'admin_cadangan',
+                `level` ENUM('superadmin','owner','admin','admin_cadangan') DEFAULT 'admin_cadangan',
                 `branch_id` INT DEFAULT NULL,
                 `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (`branch_id`) REFERENCES `branches`(`id`) ON DELETE SET NULL
+            ) ENGINE=InnoDB",
+
+            "user_permissions" => "CREATE TABLE IF NOT EXISTS `user_permissions` (
+                `id` INT AUTO_INCREMENT PRIMARY KEY,
+                `user_id` INT NOT NULL,
+                `feature` VARCHAR(50) NOT NULL,
+                `can_create` TINYINT(1) DEFAULT 0,
+                `can_read` TINYINT(1) DEFAULT 0,
+                `can_update` TINYINT(1) DEFAULT 0,
+                `can_delete` TINYINT(1) DEFAULT 0,
+                FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+                UNIQUE KEY `user_feature` (`user_id`, `feature`)
             ) ENGINE=InnoDB",
 
             "products" => "CREATE TABLE IF NOT EXISTS `products` (
@@ -135,6 +148,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 `updated_at` TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
                 FOREIGN KEY (`created_by`) REFERENCES `users`(`id`) ON DELETE SET NULL,
                 FOREIGN KEY (`updated_by`) REFERENCES `users`(`id`) ON DELETE SET NULL
+            ) ENGINE=InnoDB",
+
+            "activity_logs" => "CREATE TABLE IF NOT EXISTS `activity_logs` (
+                `id` INT AUTO_INCREMENT PRIMARY KEY,
+                `user_id` INT DEFAULT NULL,
+                `username` VARCHAR(50) NOT NULL,
+                `action` VARCHAR(50) NOT NULL,
+                `module` VARCHAR(50) NOT NULL,
+                `target_id` INT DEFAULT NULL,
+                `description` TEXT,
+                `ip_address` VARCHAR(45) DEFAULT NULL,
+                `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                KEY `idx_user_id` (`user_id`),
+                KEY `idx_action` (`action`),
+                KEY `idx_module` (`module`),
+                KEY `idx_created_at` (`created_at`),
+                FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE SET NULL
             ) ENGINE=InnoDB"
         ];
 
@@ -148,12 +178,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Default branch
             $conn->query("INSERT IGNORE INTO `branches` (id, nama_cabang, alamat) VALUES (1, 'Cabang Utama', 'Pusat')");
 
+            // Default superadmin
+            $saPwd = password_hash('superadmin123', PASSWORD_DEFAULT);
+            $stmtSA = $conn->prepare("INSERT IGNORE INTO users (username,email,phone,password,level,branch_id) VALUES (?,?,?,?,'superadmin',1)");
+            $saUser = 'superadmin'; $saEmail = 'superadmin@dapurku.com'; $saPhone = '081234567891';
+            $stmtSA->bind_param('ssss', $saUser, $saEmail, $saPhone, $saPwd);
+            $stmtSA->execute();
+
             // Default owner
             $ownerPwd = password_hash('owner123', PASSWORD_DEFAULT);
-            $stmt = $conn->prepare("INSERT IGNORE INTO users (username,email,phone,password,level,branch_id) VALUES (?,?,?,?,'owner',1)");
+            $stmtO = $conn->prepare("INSERT IGNORE INTO users (username,email,phone,password,level,branch_id) VALUES (?,?,?,?,'owner',1)");
             $ownerUser = 'owner'; $ownerEmail = 'owner@dapurku.com'; $ownerPhone = '081234567890';
-            $stmt->bind_param('ssss', $ownerUser, $ownerEmail, $ownerPhone, $ownerPwd);
-            $stmt->execute();
+            $stmtO->bind_param('ssss', $ownerUser, $ownerEmail, $ownerPhone, $ownerPwd);
+            $stmtO->execute();
 
             // Default products
             $defaultProducts = [
@@ -189,8 +226,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             file_put_contents(__DIR__ . '/db.php', $cfg);
 
             $success[] = "✅ Database <strong>$dbname</strong> berhasil dibuat!";
-            $success[] = "✅ Semua tabel berhasil (termasuk tabel <strong>products</strong>)!";
+            $success[] = "✅ Semua tabel berhasil dibuat (termasuk <strong>user_permissions</strong> dan <strong>activity_logs</strong>)!";
             $success[] = "✅ 6 produk default telah ditambahkan!";
+            $success[] = "✅ Akun Superadmin: <strong>superadmin</strong> / <strong>superadmin123</strong>";
             $success[] = "✅ Akun Owner: <strong>owner</strong> / <strong>owner123</strong>";
             $success[] = "🎉 Instalasi selesai! <a href='index.php'>Klik di sini untuk masuk</a>";
         }
@@ -203,22 +241,175 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Instalasi – DapurKu POS</title>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:linear-gradient(135deg,#1a0a00,#2d1500);min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:'DM Sans',sans-serif;color:#FFF8F0;padding:20px}
-.card{background:rgba(42,20,0,.95);border:1px solid rgba(255,107,0,.3);border-radius:20px;padding:40px;width:100%;max-width:480px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
-h1{font-family:'Playfair Display',serif;color:#FF6B00;font-size:2rem;margin-bottom:8px;text-align:center}
-p.sub{text-align:center;color:#FF9A3C;margin-bottom:30px;font-size:.9rem}
-label{display:block;font-size:.85rem;color:#FFB347;margin-bottom:6px;font-weight:500}
-input{width:100%;background:#1C0D00;border:1px solid rgba(255,107,0,.2);border-radius:10px;padding:12px 14px;color:#FFF8F0;font-size:.95rem;margin-bottom:16px;outline:none;transition:.2s;font-family:inherit}
-input:focus{border-color:#FF6B00;box-shadow:0 0 0 3px rgba(255,107,0,.15)}
-button{width:100%;background:linear-gradient(135deg,#FF6B00,#E05A00);border:none;border-radius:10px;padding:14px;color:#fff;font-size:1rem;font-weight:700;cursor:pointer;font-family:inherit;transition:.2s}
-button:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(255,107,0,.4)}
-.error{background:rgba(220,38,38,.15);border:1px solid rgba(220,38,38,.3);border-radius:10px;padding:14px;margin-bottom:14px;font-size:.9rem;color:#FCA5A5}
-.success{background:rgba(22,163,74,.15);border:1px solid rgba(22,163,74,.3);border-radius:10px;padding:14px;margin-bottom:14px;font-size:.9rem;color:#86EFAC;line-height:1.9}
-.success a{color:#FF9A3C;font-weight:700}
-.logo{font-size:3rem;display:block;text-align:center;margin-bottom:8px}
+:root {
+  --primary: #FF6B00;
+  --primary-hover: #E05A00;
+  --bg-start: #0F0800;
+  --bg-end: #1F0F00;
+  --card-bg: rgba(30, 15, 2, 0.7);
+  --border-color: rgba(255, 107, 0, 0.25);
+  --text-primary: #FFF8F0;
+  --text-secondary: #FFB347;
+  --glow: 0 0 20px rgba(255, 107, 0, 0.15);
+}
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+body {
+  background: radial-gradient(circle at center, #2d1300 0%, var(--bg-start) 100%);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'DM Sans', sans-serif;
+  color: var(--text-primary);
+  padding: 20px;
+  overflow-x: hidden;
+}
+.card {
+  background: var(--card-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-color);
+  border-radius: 24px;
+  padding: 40px;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 40px rgba(255, 107, 0, 0.05);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.card:hover {
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7), 0 0 50px rgba(255, 107, 0, 0.08);
+}
+h1 {
+  font-family: 'Playfair Display', serif;
+  color: var(--primary);
+  font-size: 2.2rem;
+  margin-bottom: 8px;
+  text-align: center;
+  text-shadow: 0 2px 10px rgba(255, 107, 0, 0.2);
+}
+p.sub {
+  text-align: center;
+  color: var(--text-secondary);
+  margin-bottom: 32px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.form-group {
+  margin-bottom: 20px;
+  position: relative;
+}
+input {
+  width: 100%;
+  background: rgba(15, 8, 2, 0.8);
+  border: 1px solid rgba(255, 107, 0, 0.25);
+  border-radius: 12px;
+  padding: 14px 16px;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  outline: none;
+  transition: all 0.25s ease;
+  font-family: inherit;
+}
+input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(255, 107, 0, 0.2), var(--glow);
+  background: rgba(15, 8, 2, 0.95);
+}
+button {
+  width: 100%;
+  background: linear-gradient(135deg, var(--primary), #E05A00);
+  border: none;
+  border-radius: 12px;
+  padding: 16px;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 15px rgba(255, 107, 0, 0.3);
+}
+button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(255, 107, 0, 0.5);
+  background: linear-gradient(135deg, #FF7B1A, #F06A00);
+}
+button:active {
+  transform: translateY(0);
+}
+.error {
+  background: rgba(220, 38, 38, 0.12);
+  border: 1px solid rgba(220, 38, 38, 0.3);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+  font-size: 0.9rem;
+  color: #FCA5A5;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.1);
+}
+.success {
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+  font-size: 0.95rem;
+  color: #a7f3d0;
+  line-height: 1.8;
+  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.05);
+}
+.success strong {
+  color: #34d399;
+}
+.success a {
+  display: inline-block;
+  margin-top: 15px;
+  width: 100%;
+  text-align: center;
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #fff;
+  text-decoration: none;
+  padding: 14px;
+  border-radius: 10px;
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+  transition: all 0.2s ease;
+}
+.success a:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.35);
+}
+.logo {
+  font-size: 3.5rem;
+  display: block;
+  text-align: center;
+  margin-bottom: 12px;
+  filter: drop-shadow(0 4px 10px rgba(255, 107, 0, 0.25));
+  animation: float 3s ease-in-out infinite;
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
 </style>
 </head>
 <body>
@@ -226,19 +417,27 @@ button:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(255,107,0,.4)
   <span class="logo">🍢</span>
   <h1>DapurKu POS</h1>
   <p class="sub">Instalasi Database – Jalankan Sekali</p>
-  <?php foreach($errors as $e): ?><div class="error">❌ <?= $e ?></div><?php endforeach; ?>
+  <?php foreach($errors as $e): ?><div class="error">❌ <?= htmlspecialchars($e) ?></div><?php endforeach; ?>
   <?php if(!empty($success)): ?>
     <div class="success"><?= implode('<br>', $success) ?></div>
   <?php else: ?>
   <form method="POST">
-    <label>Host Database</label>
-    <input type="text" name="host" value="localhost" required>
-    <label>Username MySQL</label>
-    <input type="text" name="user" value="root" required>
-    <label>Password MySQL</label>
-    <input type="password" name="pass">
-    <label>Nama Database</label>
-    <input type="text" name="dbname" value="food_sales_db" required>
+    <div class="form-group">
+      <label>Host Database</label>
+      <input type="text" name="host" value="localhost" required>
+    </div>
+    <div class="form-group">
+      <label>Username MySQL</label>
+      <input type="text" name="user" value="root" required>
+    </div>
+    <div class="form-group">
+      <label>Password MySQL</label>
+      <input type="password" name="pass">
+    </div>
+    <div class="form-group">
+      <label>Nama Database</label>
+      <input type="text" name="dbname" value="food_sales_db" required>
+    </div>
     <button type="submit">🚀 Mulai Instalasi</button>
   </form>
   <?php endif; ?>
