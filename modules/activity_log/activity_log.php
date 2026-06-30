@@ -15,7 +15,7 @@ $filterAction = isset($_GET['filter_action']) ? trim($_GET['filter_action'])    
 $filterModule = isset($_GET['filter_module']) ? trim($_GET['filter_module'])         : '';
 $filterDate   = isset($_GET['filter_date'])   ? trim($_GET['filter_date'])           : '';
 $page         = isset($_GET['p'])             ? max(1, (int)$_GET['p'])              : 1;
-$perPage      = 25;
+$perPage      = isset($_GET['limit'])         ? max(5, (int)$_GET['limit'])          : 25;
 $offset       = ($page - 1) * $perPage;
 
 // Build WHERE clause
@@ -83,9 +83,174 @@ $onlineSQL = "SELECT u.id, u.username, u.level, s.last_active, s.created_at as s
 $onlineRes = $conn->query($onlineSQL);
 $onlineUsers = $onlineRes ? $onlineRes->fetch_all(MYSQLI_ASSOC) : [];
 
-// Stats
-$todayLogins = $conn->query("SELECT COUNT(*) as c FROM activity_logs WHERE action='login' AND DATE(created_at) = CURDATE()")->fetch_assoc()['c'];
-$todayActions = $conn->query("SELECT COUNT(*) as c FROM activity_logs WHERE DATE(created_at) = CURDATE()")->fetch_assoc()['c'];
+// Helper function to render table and pagination dynamically (both AJAX and normal load)
+function showLogTableHTML($logs, $offset, $perPage, $totalLogs, $totalPages, $page, $filterUser, $filterAction, $filterModule, $filterDate) {
+    if (empty($logs)) {
+        ?>
+        <div class="log-table-wrap">
+            <div class="log-empty">
+                <div class="log-empty-icon">📋</div>
+                <p>Belum ada log aktivitas yang tercatat</p>
+                <p style="font-size:.85rem;margin-top:8px;opacity:.7">Log akan muncul saat pengguna melakukan login, logout, atau perubahan data</p>
+            </div>
+        </div>
+        <?php
+        return;
+    }
+    ?>
+    <div class="log-table-wrap">
+        <table class="log-table">
+            <thead>
+                <tr>
+                    <th style="width:5%">#</th>
+                    <th>Pengguna</th>
+                    <th>Aksi</th>
+                    <th>Modul</th>
+                    <th>Deskripsi</th>
+                    <th>IP Address</th>
+                    <th>Waktu</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php
+                $no = $offset + 1;
+                foreach ($logs as $log):
+                    $initial = strtoupper(mb_substr($log['username'], 0, 1));
+
+                    // Action badge
+                    $actionIcon = match($log['action']) {
+                        'login'  => '🔑',
+                        'logout' => '🚪',
+                        'create' => '➕',
+                        'update' => '✏️',
+                        'delete' => '🗑️',
+                        default  => '📌'
+                    };
+                    $actionCls = 'action-' . $log['action'];
+
+                    // Module icon
+                    $moduleIcon = match($log['module']) {
+                        'auth'          => '🔐',
+                        'home_content'  => '📝',
+                        'produk'        => '🍔',
+                        'kasir'         => '🧾',
+                        'stok'          => '📦',
+                        'produksi'      => '🛒',
+                        'operasional'   => '🔧',
+                        default         => '📁'
+                    };
+
+                    // Time
+                    $time = strtotime($log['created_at']);
+                    $timeFormatted = date('d/m/Y H:i:s', $time);
+                    $diff = time() - $time;
+                    if ($diff < 60) $timeAgo = 'baru saja';
+                    elseif ($diff < 3600) $timeAgo = floor($diff / 60) . ' menit lalu';
+                    elseif ($diff < 86400) $timeAgo = floor($diff / 3600) . ' jam lalu';
+                    else $timeAgo = floor($diff / 86400) . ' hari lalu';
+                ?>
+                <tr>
+                    <td style="color:var(--text3);font-size:.82rem"><?= $no++ ?></td>
+                    <td>
+                        <div class="log-user">
+                            <div class="log-avatar"><?= $initial ?></div>
+                            <span class="log-username"><?= htmlspecialchars($log['username']) ?></span>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="action-badge <?= $actionCls ?>">
+                            <?= $actionIcon ?> <?= ucfirst($log['action']) ?>
+                        </span>
+                    </td>
+                    <td>
+                        <span class="module-badge">
+                            <?= $moduleIcon ?> <?= ucfirst(str_replace('_', ' ', $log['module'])) ?>
+                        </span>
+                    </td>
+                    <td>
+                        <span class="log-description" title="<?= htmlspecialchars($log['description'] ?? '-') ?>">
+                            <?= htmlspecialchars($log['description'] ?? '-') ?>
+                        </span>
+                    </td>
+                    <td>
+                        <span class="log-ip"><?= htmlspecialchars($log['ip_address'] ?? '-') ?></span>
+                    </td>
+                    <td>
+                        <div class="log-time"><?= $timeFormatted ?></div>
+                        <span class="log-time-relative"><?= $timeAgo ?></span>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    <?php if ($totalPages > 1): ?>
+    <div class="log-pagination">
+        <div class="pagination-info">
+            Menampilkan <?= $offset + 1 ?> – <?= min($offset + $perPage, $totalLogs) ?> dari <?= number_format($totalLogs) ?> log
+        </div>
+        <div class="pagination-links">
+            <?php
+            $baseParams = ['page' => 'activity_log'];
+            if ($filterUser > 0) $baseParams['filter_user'] = $filterUser;
+            if ($filterAction !== '') $baseParams['filter_action'] = $filterAction;
+            if ($filterModule !== '') $baseParams['filter_module'] = $filterModule;
+            if ($filterDate !== '') $baseParams['filter_date'] = $filterDate;
+            $baseParams['limit'] = $perPage;
+            if (isset($_GET['uid'])) $baseParams['uid'] = (int)$_GET['uid'];
+
+            function pagUrl($p, $baseParams) {
+                $baseParams['p'] = $p;
+                return 'index.php?' . http_build_query($baseParams);
+            }
+
+            // Previous
+            if ($page > 1): ?>
+                <a href="<?= pagUrl($page - 1, $baseParams) ?>">‹</a>
+            <?php else: ?>
+                <span class="disabled">‹</span>
+            <?php endif;
+
+            // Page numbers
+            $startP = max(1, $page - 2);
+            $endP = min($totalPages, $page + 2);
+
+            if ($startP > 1): ?>
+                <a href="<?= pagUrl(1, $baseParams) ?>">1</a>
+                <?php if ($startP > 2): ?><span class="disabled">…</span><?php endif;
+            endif;
+
+            for ($i = $startP; $i <= $endP; $i++):
+                if ($i == $page): ?>
+                    <span class="active"><?= $i ?></span>
+                <?php else: ?>
+                    <a href="<?= pagUrl($i, $baseParams) ?>"><?= $i ?></a>
+                <?php endif;
+            endfor;
+
+            if ($endP < $totalPages):
+                if ($endP < $totalPages - 1): ?><span class="disabled">…</span><?php endif; ?>
+                <a href="<?= pagUrl($totalPages, $baseParams) ?>"><?= $totalPages ?></a>
+            <?php endif;
+
+            // Next
+            if ($page < $totalPages): ?>
+                <a href="<?= pagUrl($page + 1, $baseParams) ?>">›</a>
+            <?php else: ?>
+                <span class="disabled">›</span>
+            <?php endif; ?>
+        </div>
+    </div>
+    <?php endif;
+}
+
+// ─── AJAX REQUEST HANDLER ────────────────────────────────────
+if (isset($_GET['ajax'])) {
+    showLogTableHTML($logs, $offset, $perPage, $totalLogs, $totalPages, $page, $filterUser, $filterAction, $filterModule, $filterDate);
+    exit;
+}
 
 renderHeader('Log Aktivitas', 'activity_log');
 ?>
@@ -100,7 +265,7 @@ renderHeader('Log Aktivitas', 'activity_log');
             <p style="font-size:.84rem;color:var(--text3);margin:4px 0 0">Pantau semua aktivitas login, logout, dan perubahan data</p>
         </div>
         <div class="log-stats">
-            <span class="log-stat">📝 <?= number_format($totalLogs) ?> Total Log</span>
+            <span class="log-stat">📝 <span id="totalLogsBadge"><?= number_format($totalLogs) ?></span> Total Log</span>
             <span class="log-stat" style="color:#22c55e;border-color:rgba(34,197,94,.3)">🔑 <?= $todayLogins ?> Login Hari Ini</span>
             <span class="log-stat" style="color:#3b82f6;border-color:rgba(59,130,246,.3)">⚡ <?= $todayActions ?> Aksi Hari Ini</span>
         </div>
@@ -173,7 +338,7 @@ renderHeader('Log Aktivitas', 'activity_log');
 
         <div class="filter-group">
             <label>Pengguna</label>
-            <select name="filter_user">
+            <select name="filter_user" id="filterUser">
                 <option value="0">Semua Pengguna</option>
                 <?php foreach ($allUsers as $u): ?>
                     <option value="<?= $u['id'] ?>" <?= $filterUser == $u['id'] ? 'selected' : '' ?>>
@@ -185,7 +350,7 @@ renderHeader('Log Aktivitas', 'activity_log');
 
         <div class="filter-group">
             <label>Aksi</label>
-            <select name="filter_action">
+            <select name="filter_action" id="filterAction">
                 <option value="">Semua Aksi</option>
                 <?php foreach ($allActions as $a): ?>
                     <option value="<?= htmlspecialchars($a['action']) ?>" <?= $filterAction === $a['action'] ? 'selected' : '' ?>>
@@ -197,7 +362,7 @@ renderHeader('Log Aktivitas', 'activity_log');
 
         <div class="filter-group">
             <label>Modul</label>
-            <select name="filter_module">
+            <select name="filter_module" id="filterModule">
                 <option value="">Semua Modul</option>
                 <?php foreach ($allModules as $m): ?>
                     <option value="<?= htmlspecialchars($m['module']) ?>" <?= $filterModule === $m['module'] ? 'selected' : '' ?>>
@@ -209,171 +374,94 @@ renderHeader('Log Aktivitas', 'activity_log');
 
         <div class="filter-group">
             <label>Tanggal</label>
-            <input type="date" name="filter_date" value="<?= htmlspecialchars($filterDate) ?>">
+            <input type="date" name="filter_date" id="filterDate" value="<?= htmlspecialchars($filterDate) ?>">
         </div>
 
         <button type="submit" class="btn-filter">🔍 Filter</button>
-        <a href="index.php?page=activity_log" class="btn-reset">↺ Reset</a>
+        <a href="index.php?page=activity_log" class="btn-reset" id="btnReset">↺ Reset</a>
     </form>
 
-    <!-- Log Table -->
-    <?php if (empty($logs)): ?>
-        <div class="log-table-wrap">
-            <div class="log-empty">
-                <div class="log-empty-icon">📋</div>
-                <p>Belum ada log aktivitas yang tercatat</p>
-                <p style="font-size:.85rem;margin-top:8px;opacity:.7">Log akan muncul saat pengguna melakukan login, logout, atau perubahan data</p>
-            </div>
-        </div>
-    <?php else: ?>
-        <div class="log-table-wrap">
-            <table class="log-table">
-                <thead>
-                    <tr>
-                        <th style="width:5%">#</th>
-                        <th>Pengguna</th>
-                        <th>Aksi</th>
-                        <th>Modul</th>
-                        <th>Deskripsi</th>
-                        <th>IP Address</th>
-                        <th>Waktu</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php
-                    $no = $offset + 1;
-                    foreach ($logs as $log):
-                        $initial = strtoupper(mb_substr($log['username'], 0, 1));
-
-                        // Action badge
-                        $actionIcon = match($log['action']) {
-                            'login'  => '🔑',
-                            'logout' => '🚪',
-                            'create' => '➕',
-                            'update' => '✏️',
-                            'delete' => '🗑️',
-                            default  => '📌'
-                        };
-                        $actionCls = 'action-' . $log['action'];
-
-                        // Module icon
-                        $moduleIcon = match($log['module']) {
-                            'auth'          => '🔐',
-                            'home_content'  => '📝',
-                            'produk'        => '🍔',
-                            'kasir'         => '🧾',
-                            'stok'          => '📦',
-                            'produksi'      => '🛒',
-                            'operasional'   => '🔧',
-                            default         => '📁'
-                        };
-
-                        // Time
-                        $time = strtotime($log['created_at']);
-                        $timeFormatted = date('d/m/Y H:i:s', $time);
-                        $diff = time() - $time;
-                        if ($diff < 60) $timeAgo = 'baru saja';
-                        elseif ($diff < 3600) $timeAgo = floor($diff / 60) . ' menit lalu';
-                        elseif ($diff < 86400) $timeAgo = floor($diff / 3600) . ' jam lalu';
-                        else $timeAgo = floor($diff / 86400) . ' hari lalu';
-                    ?>
-                    <tr>
-                        <td style="color:var(--text3);font-size:.82rem"><?= $no++ ?></td>
-                        <td>
-                            <div class="log-user">
-                                <div class="log-avatar"><?= $initial ?></div>
-                                <span class="log-username"><?= htmlspecialchars($log['username']) ?></span>
-                            </div>
-                        </td>
-                        <td>
-                            <span class="action-badge <?= $actionCls ?>">
-                                <?= $actionIcon ?> <?= ucfirst($log['action']) ?>
-                            </span>
-                        </td>
-                        <td>
-                            <span class="module-badge">
-                                <?= $moduleIcon ?> <?= ucfirst(str_replace('_', ' ', $log['module'])) ?>
-                            </span>
-                        </td>
-                        <td>
-                            <span class="log-description" title="<?= htmlspecialchars($log['description'] ?? '-') ?>">
-                                <?= htmlspecialchars($log['description'] ?? '-') ?>
-                            </span>
-                        </td>
-                        <td>
-                            <span class="log-ip"><?= htmlspecialchars($log['ip_address'] ?? '-') ?></span>
-                        </td>
-                        <td>
-                            <div class="log-time"><?= $timeFormatted ?></div>
-                            <span class="log-time-relative"><?= $timeAgo ?></span>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
-
-        <!-- Pagination -->
-        <?php if ($totalPages > 1): ?>
-        <div class="log-pagination">
-            <div class="pagination-info">
-                Menampilkan <?= $offset + 1 ?> – <?= min($offset + $perPage, $totalLogs) ?> dari <?= number_format($totalLogs) ?> log
-            </div>
-            <div class="pagination-links">
-                <?php
-                // Build base URL for pagination
-                $baseParams = ['page' => 'activity_log'];
-                if ($filterUser > 0) $baseParams['filter_user'] = $filterUser;
-                if ($filterAction !== '') $baseParams['filter_action'] = $filterAction;
-                if ($filterModule !== '') $baseParams['filter_module'] = $filterModule;
-                if ($filterDate !== '') $baseParams['filter_date'] = $filterDate;
-                if (isset($_GET['uid'])) $baseParams['uid'] = (int)$_GET['uid'];
-
-                function pagUrl($p, $baseParams) {
-                    $baseParams['p'] = $p;
-                    return 'index.php?' . http_build_query($baseParams);
-                }
-
-                // Previous
-                if ($page > 1): ?>
-                    <a href="<?= pagUrl($page - 1, $baseParams) ?>">‹</a>
-                <?php else: ?>
-                    <span class="disabled">‹</span>
-                <?php endif;
-
-                // Page numbers
-                $startP = max(1, $page - 2);
-                $endP = min($totalPages, $page + 2);
-
-                if ($startP > 1): ?>
-                    <a href="<?= pagUrl(1, $baseParams) ?>">1</a>
-                    <?php if ($startP > 2): ?><span class="disabled">…</span><?php endif;
-                endif;
-
-                for ($i = $startP; $i <= $endP; $i++):
-                    if ($i == $page): ?>
-                        <span class="active"><?= $i ?></span>
-                    <?php else: ?>
-                        <a href="<?= pagUrl($i, $baseParams) ?>"><?= $i ?></a>
-                    <?php endif;
-                endfor;
-
-                if ($endP < $totalPages):
-                    if ($endP < $totalPages - 1): ?><span class="disabled">…</span><?php endif; ?>
-                    <a href="<?= pagUrl($totalPages, $baseParams) ?>"><?= $totalPages ?></a>
-                <?php endif;
-
-                // Next
-                if ($page < $totalPages): ?>
-                    <a href="<?= pagUrl($page + 1, $baseParams) ?>">›</a>
-                <?php else: ?>
-                    <span class="disabled">›</span>
-                <?php endif; ?>
-            </div>
-        </div>
-        <?php endif; ?>
-    <?php endif; ?>
+    <!-- Log Table & Pagination Container -->
+    <div id="logTableContainer" style="transition: opacity 0.2s ease-in-out;">
+        <?php showLogTableHTML($logs, $offset, $perPage, $totalLogs, $totalPages, $page, $filterUser, $filterAction, $filterModule, $filterDate); ?>
+    </div>
 
 </div>
 
+<!-- Load jQuery and AJAX Handling Scripts -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+$(document).ready(function() {
+    // Intercept form submit
+    $('#logFilterForm').on('submit', function(e) {
+        e.preventDefault();
+        loadLogs($(this).serialize());
+    });
+
+    // Intercept pagination clicks
+    $(document).on('click', '.pagination-links a', function(e) {
+        e.preventDefault();
+        const url = $(this).attr('href');
+        if (url) {
+            const query = url.substring(url.indexOf('?') + 1);
+            loadLogs(query);
+        }
+    });
+
+    // Intercept reset button click
+    $('#btnReset').on('click', function(e) {
+        e.preventDefault();
+        $('#logFilterForm')[0].reset();
+        
+        // Reset custom selects if any
+        $('#filterUser').val('0');
+        $('#filterAction').val('');
+        $('#filterModule').val('');
+        $('#filterDate').val('');
+
+        const uid = getUrlParameter('uid');
+        const resetQuery = 'page=activity_log' + (uid ? '&uid=' + uid : '');
+        loadLogs(resetQuery);
+    });
+
+    function loadLogs(queryString) {
+        // Show visual loading status
+        $('#logTableContainer').css('opacity', 0.4);
+
+        // Fetch logs via AJAX
+        const ajaxUrl = 'index.php?' + queryString + '&ajax=1';
+
+        $.get(ajaxUrl, function(data) {
+            $('#logTableContainer').html(data).css('opacity', 1);
+
+            // Update page URL in browser history
+            const newUrl = 'index.php?' + queryString;
+            history.pushState(null, '', newUrl);
+
+            // Dynamically update the total count badge
+            const totalText = $('.pagination-info').text();
+            if (totalText) {
+                const totalMatch = totalText.match(/dari\s+([\d,.]+)\s+log/i);
+                if (totalMatch && totalMatch[1]) {
+                    $('#totalLogsBadge').text(totalMatch[1]);
+                }
+            } else if ($('.log-empty').length > 0) {
+                $('#totalLogsBadge').text('0');
+            }
+        }).fail(function() {
+            $('#logTableContainer').css('opacity', 1);
+            alert('Gagal memuat log aktivitas.');
+        });
+    }
+
+    function getUrlParameter(name) {
+        name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
+        const regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
+        const results = regex.exec(location.search);
+        return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
+    }
+});
+</script>
+
 <?php renderFooter(); ?>
+
